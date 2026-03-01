@@ -24,6 +24,5 @@ namespace BiblioTarApp.DataContext.Entites
         public int Ertelekes { get; set; }
         public string Kategoria {  get; set; }
         public DateTime PublikalasIdeje { get; set; }
-        //br test
     }
 }
