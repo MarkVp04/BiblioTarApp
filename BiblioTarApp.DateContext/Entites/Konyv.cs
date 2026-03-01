@@ -15,6 +15,7 @@ namespace BiblioTarApp.DataContext.Entites
 
     public class Konyv
     {
+
         public int Id { get; set; }
         public KonyvStatusz Statusz { get; set; } = KonyvStatusz.Elerheto;
         public string Cim { get; set; }
@@ -23,6 +24,6 @@ namespace BiblioTarApp.DataContext.Entites
         public int Ertelekes { get; set; }
         public string Kategoria {  get; set; }
         public DateTime PublikalasIdeje { get; set; }
-
+        // test
     }
 }

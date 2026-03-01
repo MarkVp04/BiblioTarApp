@@ -18,6 +18,7 @@ namespace BiblioTarApp.DataContext.Entites
             Konyvtaros = 2,
             Adminisztrator = 4
         }
+        //test2
 
     }
 }

@@ -22,5 +22,6 @@ namespace BiblioTarApp.DataContext.Entites
         public KolcsonzesStatusz Statusz { get; set; }
         public Felhasznalo Felhasznalo { get; set; }
         public Konyv Konyv { get; set; }
+        //test3
     }
 }

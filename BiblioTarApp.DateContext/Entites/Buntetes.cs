@@ -20,5 +20,6 @@ namespace BiblioTarApp.DataContext.Entites
 
         public Foglalas Foglalas { get; set; }
         public Felhasznalo Felhasznalo { get; set; }
+        //test4
     }
 }
