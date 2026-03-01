@@ -1,0 +1,6 @@
+@BiblioTarApp_HostAddress = http://localhost:5057
+
+GET {{BiblioTarApp_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
