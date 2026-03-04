@@ -19,6 +19,6 @@ namespace BiblioTarApp.DataContext.Context
         public DbSet<Foglalas> Foglalasok { get; set; }
         public DbSet<Kolcsonzes> Kolcsonzesek { get; set; }
         public DbSet<Konyv> Konyvek { get; set; }
-        public DbSet<Lakcim> Lakimcek { get; set; }
+        public DbSet<Lakcim> Lakcimek { get; set; }
     }
 }
