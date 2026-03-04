@@ -17,12 +17,14 @@ namespace BiblioTarApp.DataContext.Entites
     {
 
         public int Id { get; set; }
-        public KonyvStatusz Statusz { get; set; } = KonyvStatusz.Elerheto;
-        public string Cim { get; set; }
-        public string Szerzo { get; set; }
-        public KonyvAllapot Allapot {  get; set; }
-        public int Ertelekes { get; set; }
-        public string Kategoria {  get; set; }
-        public DateTime PublikalasIdeje { get; set; }
+        public string Cim { get; set; } = null!;
+        public string Szerzo { get; set; } = null!;
+        public string? Isbn { get; set; } 
+        public string? Kategoria { get; set; }
+        public int Kiadasev { get; set; } 
+        public string? Allapot { get; set; }
+        public string? Statusz { get; set; }
+        public DateTime? PublikalasIdeje { get; set; }
+        public bool Ertelekes { get; set; }
     }
 }

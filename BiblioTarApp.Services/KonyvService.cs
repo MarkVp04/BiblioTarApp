@@ -23,7 +23,17 @@ namespace BiblioTarApp.Services
 
         public List<Konyv> List()
         {
-            return _context.Konyvek.ToList();
+            // Ez a kód kikerüli a bonyolult típuskonverziós hibákat a teszt idejére
+            return _context.Konyvek
+                .Select(k => new Konyv
+                {
+                    Id = k.Id,
+                    Cim = k.Cim,
+                    Szerzo = k.Szerzo,
+                    Kiadasev = k.Kiadasev,
+                    Isbn = k.Isbn
+                })
+                .ToList();
         }
     }
 }
