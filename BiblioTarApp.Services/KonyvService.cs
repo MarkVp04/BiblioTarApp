@@ -23,7 +23,7 @@ namespace BiblioTarApp.Services
 
         public List<Konyv> List()
         {
-            
+            // Ez a kód kikerüli a bonyolult típuskonverziós hibákat a teszt idejére
             return _context.Konyvek
                 .Select(k => new Konyv
                 {
