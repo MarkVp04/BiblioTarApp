@@ -9,7 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+string connectionString = "Server=10.137.74.81,1433;Database=KonyvtarDB;User Id=biblio_user;Password=user;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString));
