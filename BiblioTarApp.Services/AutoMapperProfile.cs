@@ -9,13 +9,13 @@ namespace BiblioTarApp.Services
         public AutoMapperProfile()
         {
             // KÖNYV
-            CreateMap<Konyv, KonyvGetDto>();
-            CreateMap<KonyvCreateDto, Konyv>();
-            CreateMap<KonyvUpdateDto, Konyv>();
+            CreateMap<Konyv, KonyvGetDto>().ReverseMap();
+            CreateMap<KonyvCreateDto, Konyv>().ReverseMap();
+            CreateMap<KonyvUpdateDto, Konyv>().ReverseMap(); ;
 
             // LAKCÍM
-            CreateMap<Lakcim, LakcimGetDto>();
-            CreateMap<LakcimCreateDto, Lakcim>();
+            CreateMap<Lakcim, LakcimGetDto>().ReverseMap();
+            CreateMap<LakcimCreateDto, Lakcim>().ReverseMap();
         }
     }
 }
