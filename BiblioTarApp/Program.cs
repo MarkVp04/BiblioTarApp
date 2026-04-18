@@ -2,6 +2,8 @@ using BiblioTarApp.DataContext.Context;
 using BiblioTarApp.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using AutoMapper;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,13 +14,21 @@ builder.Services.AddControllers();
 
 string connectionString = "Server=10.137.74.81,1433;Database=KonyvtarDB;User Id=biblio_user;Password=user;TrustServerCertificate=True;";
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+//builder.Services.AddDbContext<AppDbContext>(options =>
+//    options.UseSqlServer(connectionString));
 
 //builder.Services.AddDbContext<AppDbContext>(options =>
 //    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("BiblioTarContext")));
+
+
+
 builder.Services.AddScoped<IKonyvServices, KonyvService>();
+builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddScoped<ILakcimService, LakcimService>();
+
 
 //Swegger
 builder.Services.AddEndpointsApiExplorer();

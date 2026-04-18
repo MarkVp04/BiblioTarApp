@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BiblioTarApp.DataContext.Entites
 {
@@ -11,12 +6,13 @@ namespace BiblioTarApp.DataContext.Entites
     {
         public int Id { get; set; }
         public int Iranyitoszam { get; set; }
-        public string Varos { get; set; }
-        public string Utca { get; set; }
-        public string hazszam { get; set; }
+        public string Varos { get; set; } = string.Empty;
+        public string Utca { get; set; } = string.Empty;
+        public string hazszam { get; set; } = string.Empty;
+
         [ForeignKey("Felhasznalo")]
-        public int? FelhasznaloId { get; set; }
-        public Felhasznalo Felhasznalo { get; set; }
-        
+        public int FelhasznaloId { get; set; }
+
+        public Felhasznalo Felhasznalo { get; set; } = null!;
     }
 }

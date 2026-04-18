@@ -4,6 +4,7 @@ using BiblioTarApp.DataContext.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BiblioTarApp.DataContext.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260417022918_FixRelations")]
+    partial class FixRelations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -223,7 +226,8 @@ namespace BiblioTarApp.DataContext.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FelhasznaloId");
+                    b.HasIndex("FelhasznaloId")
+                        .IsUnique();
 
                     b.ToTable("Lakcimek");
                 });
@@ -294,8 +298,8 @@ namespace BiblioTarApp.DataContext.Migrations
             modelBuilder.Entity("BiblioTarApp.DataContext.Entites.Lakcim", b =>
                 {
                     b.HasOne("BiblioTarApp.DataContext.Entites.Felhasznalo", "Felhasznalo")
-                        .WithMany("Lakcimek")
-                        .HasForeignKey("FelhasznaloId")
+                        .WithOne("Lakcim")
+                        .HasForeignKey("BiblioTarApp.DataContext.Entites.Lakcim", "FelhasznaloId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -310,7 +314,7 @@ namespace BiblioTarApp.DataContext.Migrations
 
                     b.Navigation("Kolcsonzesek");
 
-                    b.Navigation("Lakcimek");
+                    b.Navigation("Lakcim");
                 });
 
             modelBuilder.Entity("BiblioTarApp.DataContext.Entites.Foglalas", b =>

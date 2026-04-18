@@ -28,3 +28,4 @@ namespace BiblioTarApp.DataContext.Entites
         public bool Ertelekes { get; set; }
     }
 }
+

@@ -1,10 +1,5 @@
 ﻿using BiblioTarApp.DataContext.Entites;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BiblioTarApp.DataContext.Context
 {
@@ -20,5 +15,22 @@ namespace BiblioTarApp.DataContext.Context
         public DbSet<Kolcsonzes> Kolcsonzesek { get; set; }
         public DbSet<Konyv> Konyvek { get; set; }
         public DbSet<Lakcim> Lakcimek { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Felhasznalo>()
+                .HasMany(f => f.Lakcimek)
+                .WithOne(l => l.Felhasznalo)
+                .HasForeignKey(l => l.FelhasznaloId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Foglalas>()
+                .HasOne(f => f.Kolcsonzes)
+                .WithOne(k => k.Foglalas)
+                .HasForeignKey<Kolcsonzes>(k => k.FoglalasId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
     }
 }
