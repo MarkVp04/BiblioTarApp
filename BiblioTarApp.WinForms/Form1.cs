@@ -45,6 +45,20 @@ public partial class Form1 : Form
     private DataGridView _librarianLoansGrid = null!;
     private readonly List<LibrarianLoanMockItem> _librarianLoansData = new();
     private int _nextLibrarianLoanId = 1;
+    private DataGridView _adminStockGrid = null!;
+    private TextBox _adminCimInput = null!;
+    private TextBox _adminSzerzoInput = null!;
+    private TextBox _adminIsbnInput = null!;
+    private TextBox _adminKategoriaInput = null!;
+    private TextBox _adminKiadasevInput = null!;
+    private CheckBox _adminKolcsonozhetoCheck = null!;
+    private ComboBox _adminAllapotCombo = null!;
+    private Label _adminDetailFeedbackLabel = null!;
+    private Label _adminStockInfoLabel = null!;
+    private bool _adminSuppressSelectionChanged;
+    private bool _adminIsNewBookMode;
+    private readonly List<AdminBookMockItem> _adminBooksData = new();
+    private int _nextAdminBookId = 1;
 
     public Form1()
     {
@@ -78,9 +92,11 @@ public partial class Form1 : Form
         ApplyTheme(root);
         SeedUserMockData();
         SeedLibrarianMockData();
+        SeedAdminMockData();
         RefreshUserBooksGrid(string.Empty);
         RefreshUserHistoryGrid();
         RefreshLibrarianLoansGrid();
+        RefreshAdminStockGrid();
         ApplyRoleTabs("Felhasznalo");
     }
 
@@ -802,36 +818,373 @@ public partial class Form1 : Form
         tab.Controls.Add(layout);
 
         var stockGroup = new GroupBox { Text = "Konyvallomany kezeles", Dock = DockStyle.Fill };
-        var stockPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8) };
+        var stockPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(8) };
         stockPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         stockPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         stockPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        stockPanel.Controls.Add(CreateButtonsRow("Uj konyv", "Modositas", "Torles", "Frissites"), 0, 0);
-        stockPanel.Controls.Add(CreateSampleGrid(new[] { "Id", "Cim", "Szerzo", "Kategoria", "Allapot", "Kolcsonozheto" }), 0, 1);
-        stockPanel.Controls.Add(CreateButtonsRow("Konyv allapot: Jo", "Konyv allapot: Serult", "Konyv allapot: Elveszett"), 0, 2);
+        stockPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var stockToolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        stockToolbar.Controls.Add(CreatePrimaryButton("Uj konyv", HandleAdminNewBookClick));
+        stockToolbar.Controls.Add(CreatePrimaryButton("Modositas (betoltes)", HandleAdminReloadSelectionClick));
+        stockToolbar.Controls.Add(CreatePrimaryButton("Torles", HandleAdminDeleteClick));
+        stockToolbar.Controls.Add(CreatePrimaryButton("Frissites", HandleAdminRefreshClick));
+
+        _adminStockGrid = CreateMockDataGrid();
+        _adminStockGrid.SelectionChanged += AdminStockGrid_SelectionChanged;
+
+        var stateToolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Jo", (_, _) => HandleAdminSetStateClick("Jo")));
+        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Serult", (_, _) => HandleAdminSetStateClick("Serult")));
+        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Elveszett", (_, _) => HandleAdminSetStateClick("Elveszett")));
+
+        _adminStockInfoLabel = new Label { AutoSize = true, Text = "Konyvek: 0" };
+
+        stockPanel.Controls.Add(stockToolbar, 0, 0);
+        stockPanel.Controls.Add(_adminStockGrid, 0, 1);
+        stockPanel.Controls.Add(stateToolbar, 0, 2);
+        stockPanel.Controls.Add(_adminStockInfoLabel, 0, 3);
         stockGroup.Controls.Add(stockPanel);
 
         var detailsGroup = new GroupBox { Text = "Konyv adatok", Dock = DockStyle.Fill };
-        var detailsForm = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
+        var detailsOuter = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(12) };
+        detailsOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        detailsOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        detailsOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var detailsForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         detailsForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         detailsForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddRow(detailsForm, "Cim", new TextBox());
-        AddRow(detailsForm, "Szerzo", new TextBox());
-        AddRow(detailsForm, "ISBN", new TextBox());
-        AddRow(detailsForm, "Kategoria", new TextBox());
-        AddRow(detailsForm, "Kiadas eve", new TextBox());
-        AddRow(detailsForm, "Kolcsonozheto", new CheckBox { Text = "Igen", AutoSize = true });
-        AddRow(detailsForm, "Allapot", new ComboBox
+
+        _adminCimInput = new TextBox();
+        _adminSzerzoInput = new TextBox();
+        _adminIsbnInput = new TextBox();
+        _adminKategoriaInput = new TextBox();
+        _adminKiadasevInput = new TextBox();
+        _adminKolcsonozhetoCheck = new CheckBox { Text = "Kolcsonozheto", AutoSize = true };
+        _adminAllapotCombo = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             DataSource = new[] { "Jo", "Serult", "Elveszett" }
-        });
-        AddRow(detailsForm, "", CreateButtonsRow("Ment", "Reset"));
-        detailsGroup.Controls.Add(detailsForm);
+        };
+
+        AddRow(detailsForm, "Cim *", _adminCimInput);
+        AddRow(detailsForm, "Szerzo *", _adminSzerzoInput);
+        AddRow(detailsForm, "ISBN", _adminIsbnInput);
+        AddRow(detailsForm, "Kategoria", _adminKategoriaInput);
+        AddRow(detailsForm, "Kiadas eve *", _adminKiadasevInput);
+        AddRow(detailsForm, "", _adminKolcsonozhetoCheck);
+        AddRow(detailsForm, "Allapot", _adminAllapotCombo);
+
+        var detailButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        detailButtons.Controls.Add(CreatePrimaryButton("Ment", HandleAdminSaveClick));
+        detailButtons.Controls.Add(CreatePrimaryButton("Reset", HandleAdminResetClick));
+
+        _adminDetailFeedbackLabel = new Label
+        {
+            AutoSize = true,
+            Text = "Valassz sort a tablazatbol, vagy kattints az Uj konyv gombra.",
+            ForeColor = MutedTextColor
+        };
+
+        detailsOuter.Controls.Add(detailsForm, 0, 0);
+        detailsOuter.Controls.Add(detailButtons, 0, 1);
+        detailsOuter.Controls.Add(_adminDetailFeedbackLabel, 0, 2);
+        detailsGroup.Controls.Add(detailsOuter);
 
         layout.Controls.Add(stockGroup, 0, 0);
         layout.Controls.Add(detailsGroup, 0, 1);
         return tab;
+    }
+
+    private void SeedAdminMockData()
+    {
+        if (_adminBooksData.Count > 0)
+        {
+            return;
+        }
+
+        _adminBooksData.AddRange(new[]
+        {
+            new AdminBookMockItem(1, "Egri csillagok", "Gardonyi Geza", "978963", "Tortenelmi", 1899, true, "Jo"),
+            new AdminBookMockItem(2, "Tuskevar", "Fekete Istvan", null, "Ifjusagi", 1957, true, "Jo"),
+            new AdminBookMockItem(3, "A Pal utcai fiuk", "Molnar Ferenc", "9789632", "Ifjusagi", 1907, false, "Serult")
+        });
+        _nextAdminBookId = 4;
+    }
+
+    private void RefreshAdminStockGrid(int? selectIdAfter = null)
+    {
+        _adminSuppressSelectionChanged = true;
+        try
+        {
+            _adminStockGrid.DataSource = null;
+            _adminStockGrid.DataSource = _adminBooksData.OrderBy(b => b.Id).ToList();
+            _adminStockInfoLabel.Text = $"Konyvek: {_adminBooksData.Count}";
+
+            if (selectIdAfter is int id)
+            {
+                foreach (DataGridViewRow row in _adminStockGrid.Rows)
+                {
+                    if (row.DataBoundItem is AdminBookMockItem book && book.Id == id)
+                    {
+                        row.Selected = true;
+                        _adminStockGrid.CurrentCell = row.Cells.Count > 0 ? row.Cells[0] : null;
+                        break;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _adminSuppressSelectionChanged = false;
+        }
+
+        if (selectIdAfter is int selId)
+        {
+            var book = _adminBooksData.FirstOrDefault(b => b.Id == selId);
+            if (book is not null)
+            {
+                LoadAdminDetailFromBook(book);
+            }
+        }
+    }
+
+    private void AdminStockGrid_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (_adminSuppressSelectionChanged)
+        {
+            return;
+        }
+
+        if (_adminStockGrid.CurrentRow?.DataBoundItem is AdminBookMockItem book)
+        {
+            _adminIsNewBookMode = false;
+            LoadAdminDetailFromBook(book);
+            SetAdminDetailFeedback("Kivalasztva: szerkesztheted az alabbi mezoket.");
+        }
+    }
+
+    private void LoadAdminDetailFromBook(AdminBookMockItem book)
+    {
+        _adminCimInput.Text = book.Cim;
+        _adminSzerzoInput.Text = book.Szerzo;
+        _adminIsbnInput.Text = book.Isbn ?? string.Empty;
+        _adminKategoriaInput.Text = book.Kategoria;
+        _adminKiadasevInput.Text = book.Kiadasev.ToString();
+        _adminKolcsonozhetoCheck.Checked = book.Kolcsonozheto;
+        _adminAllapotCombo.SelectedItem = book.Allapot;
+    }
+
+    private void ClearAdminDetailForm()
+    {
+        _adminCimInput.Clear();
+        _adminSzerzoInput.Clear();
+        _adminIsbnInput.Clear();
+        _adminKategoriaInput.Clear();
+        _adminKiadasevInput.Clear();
+        _adminKolcsonozhetoCheck.Checked = true;
+        _adminAllapotCombo.SelectedIndex = 0;
+    }
+
+    private void SetAdminDetailFeedback(string text, bool isError = false)
+    {
+        _adminDetailFeedbackLabel.Text = text;
+        _adminDetailFeedbackLabel.ForeColor = isError ? Color.FromArgb(185, 28, 28) : MutedTextColor;
+    }
+
+    private AdminBookMockItem? GetSelectedAdminBook()
+    {
+        if (_adminStockGrid.CurrentRow?.DataBoundItem is AdminBookMockItem book)
+        {
+            return book;
+        }
+
+        return null;
+    }
+
+    private void HandleAdminNewBookClick(object? sender, EventArgs e)
+    {
+        _adminSuppressSelectionChanged = true;
+        try
+        {
+            _adminStockGrid.ClearSelection();
+        }
+        finally
+        {
+            _adminSuppressSelectionChanged = false;
+        }
+
+        _adminIsNewBookMode = true;
+        ClearAdminDetailForm();
+        SetAdminDetailFeedback("Uj konyv mod: toltsd ki a kotelezo mezoket, majd Ment.");
+        _statusLabel.Text = "Admin nezet: uj konyv mod (mock).";
+    }
+
+    private void HandleAdminReloadSelectionClick(object? sender, EventArgs e)
+    {
+        var selected = GetSelectedAdminBook();
+        if (selected is null)
+        {
+            MessageBox.Show("Valassz egy konyvet a tablazatbol.", "Modositas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _adminIsNewBookMode = false;
+        LoadAdminDetailFromBook(selected);
+        SetAdminDetailFeedback("Adatok ujratoltve a kivalasztott sorbol.");
+        _statusLabel.Text = "Admin nezet: szerkesztes (mock).";
+    }
+
+    private void HandleAdminDeleteClick(object? sender, EventArgs e)
+    {
+        var selected = GetSelectedAdminBook();
+        if (selected is null)
+        {
+            MessageBox.Show("Valassz egy konyvet a torleshez.", "Torles", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (MessageBox.Show($"Biztosan torlod?\n\n{selected.Cim}", "Torles", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+        {
+            return;
+        }
+
+        _adminBooksData.RemoveAll(b => b.Id == selected.Id);
+        _adminIsNewBookMode = false;
+        ClearAdminDetailForm();
+        RefreshAdminStockGrid();
+        SetAdminDetailFeedback("Konyv torolve (mock).");
+        _statusLabel.Text = "Admin nezet: torles (mock).";
+    }
+
+    private void HandleAdminRefreshClick(object? sender, EventArgs e)
+    {
+        var id = GetSelectedAdminBook()?.Id;
+        RefreshAdminStockGrid(id);
+        SetAdminDetailFeedback("Lista frissitve (mock).");
+        _statusLabel.Text = "Admin nezet: frissites (mock).";
+    }
+
+    private void HandleAdminSetStateClick(string allapot)
+    {
+        var selected = GetSelectedAdminBook();
+        if (selected is null)
+        {
+            MessageBox.Show("Valassz egy konyvet az allapot modositasahoz.", "Allapot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var idx = _adminBooksData.FindIndex(b => b.Id == selected.Id);
+        if (idx < 0)
+        {
+            return;
+        }
+
+        _adminBooksData[idx] = selected with { Allapot = allapot };
+        RefreshAdminStockGrid(selected.Id);
+        SetAdminDetailFeedback($"Allapot beallitva: {allapot} (mock).");
+        _statusLabel.Text = "Admin nezet: allapot (mock).";
+    }
+
+    private void HandleAdminSaveClick(object? sender, EventArgs e)
+    {
+        var cim = _adminCimInput.Text.Trim();
+        var szerzo = _adminSzerzoInput.Text.Trim();
+        if (string.IsNullOrWhiteSpace(cim) || string.IsNullOrWhiteSpace(szerzo))
+        {
+            SetAdminDetailFeedback("A cim es a szerzo megadasa kotelezo.", true);
+            return;
+        }
+
+        if (!int.TryParse(_adminKiadasevInput.Text.Trim(), out var kiadasev))
+        {
+            SetAdminDetailFeedback("A kiadas eve egesz szam legyen.", true);
+            return;
+        }
+
+        var kategoria = string.IsNullOrWhiteSpace(_adminKategoriaInput.Text) ? "Egyeb" : _adminKategoriaInput.Text.Trim();
+        var isbn = string.IsNullOrWhiteSpace(_adminIsbnInput.Text) ? null : _adminIsbnInput.Text.Trim();
+        var allapot = _adminAllapotCombo.SelectedItem?.ToString() ?? "Jo";
+        var kolcsonozheto = _adminKolcsonozhetoCheck.Checked;
+
+        if (_adminIsNewBookMode)
+        {
+            var id = _nextAdminBookId++;
+            var book = new AdminBookMockItem(id, cim, szerzo, isbn, kategoria, kiadasev, kolcsonozheto, allapot);
+            _adminBooksData.Add(book);
+            _adminIsNewBookMode = false;
+            RefreshAdminStockGrid(book.Id);
+            SetAdminDetailFeedback($"Uj konyv mentve (mock). ID: {id}.");
+            _statusLabel.Text = "Admin nezet: uj konyv (mock).";
+            return;
+        }
+
+        var selected = GetSelectedAdminBook();
+        if (selected is null)
+        {
+            SetAdminDetailFeedback("Valassz sort a modositashoz, vagy hasznald az Uj konyv gombot.", true);
+            return;
+        }
+
+        var index = _adminBooksData.FindIndex(b => b.Id == selected.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        _adminBooksData[index] = new AdminBookMockItem(
+            selected.Id,
+            cim,
+            szerzo,
+            isbn,
+            kategoria,
+            kiadasev,
+            kolcsonozheto,
+            allapot);
+        RefreshAdminStockGrid(selected.Id);
+        SetAdminDetailFeedback("Valtozasok mentve (mock).");
+        _statusLabel.Text = "Admin nezet: mentes (mock).";
+    }
+
+    private void HandleAdminResetClick(object? sender, EventArgs e)
+    {
+        if (_adminIsNewBookMode)
+        {
+            ClearAdminDetailForm();
+            SetAdminDetailFeedback("Urlap torolve (uj konyv mod).");
+            return;
+        }
+
+        var selected = GetSelectedAdminBook();
+        if (selected is not null)
+        {
+            LoadAdminDetailFromBook(selected);
+            SetAdminDetailFeedback("Visszaallitva a kivalasztott sor alapjan.");
+        }
+        else
+        {
+            ClearAdminDetailForm();
+            SetAdminDetailFeedback("Nincs kivalasztott sor — urlap torolve.");
+        }
     }
 
     private static TableLayoutPanel CreateTwoColumnLayout()
@@ -1068,3 +1421,13 @@ internal sealed record LibrarianLoanMockItem(
     string Statusz,
     int KesesNapok,
     int Hosszabbitasok);
+
+internal sealed record AdminBookMockItem(
+    int Id,
+    string Cim,
+    string Szerzo,
+    string? Isbn,
+    string Kategoria,
+    int Kiadasev,
+    bool Kolcsonozheto,
+    string Allapot);
