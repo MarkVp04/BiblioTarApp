@@ -2,6 +2,14 @@ namespace BiblioTarApp.WinForms;
 
 public partial class Form1 : Form
 {
+    private static readonly Color AppBackground = Color.FromArgb(245, 247, 250);
+    private static readonly Color SurfaceBackground = Color.White;
+    private static readonly Color PrimaryColor = Color.FromArgb(37, 99, 235);
+    private static readonly Color TextColor = Color.FromArgb(31, 41, 55);
+    private static readonly Color MutedTextColor = Color.FromArgb(75, 85, 99);
+    private static readonly Font BaseFont = new("Segoe UI", 10F, FontStyle.Regular);
+    private static readonly Font HeaderFont = new("Segoe UI", 13F, FontStyle.Bold);
+
     private Label _statusLabel = null!;
 
     public Form1()
@@ -31,6 +39,8 @@ public partial class Form1 : Form
             Margin = new Padding(3, 8, 3, 8)
         };
         root.Controls.Add(_statusLabel, 0, 2);
+
+        ApplyTheme(root);
     }
 
     private static TableLayoutPanel CreateRootLayout()
@@ -63,7 +73,7 @@ public partial class Form1 : Form
         headerPanel.Controls.Add(new Label
         {
             AutoSize = true,
-            Font = new Font("Segoe UI", 13, FontStyle.Bold),
+            Font = HeaderFont,
             Text = "BiblioTarApp - Teljes GUI vaz"
         }, 0, 0);
 
@@ -258,7 +268,17 @@ public partial class Form1 : Form
 
     private static Control CreateButtonsRow(params string[] captions)
     {
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
+            Margin = new Padding(0, 6, 0, 0),
+            Padding = new Padding(0),
+            FlowDirection = FlowDirection.LeftToRight
+        };
+
         foreach (var caption in captions)
         {
             flow.Controls.Add(CreateActionButton(caption));
@@ -273,9 +293,14 @@ public partial class Form1 : Form
         {
             AutoSize = true,
             Text = text,
-            Padding = new Padding(8, 4, 8, 4)
+            Padding = new Padding(10, 5, 10, 5),
+            Margin = new Padding(0, 0, 8, 8),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = Color.White,
+            BackColor = PrimaryColor
         };
 
+        button.FlatAppearance.BorderSize = 0;
         button.Click += (_, _) =>
             MessageBox.Show("Ez a funkcio meg nincs implementalva.", "GUI vaz", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
@@ -293,6 +318,15 @@ public partial class Form1 : Form
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect
         };
+        grid.BackgroundColor = SurfaceBackground;
+        grid.BorderStyle = BorderStyle.None;
+        grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(239, 246, 255);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = TextColor;
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font(BaseFont, FontStyle.Bold);
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
+        grid.DefaultCellStyle.SelectionForeColor = Color.Black;
+        grid.RowHeadersVisible = false;
 
         foreach (var column in columns)
         {
@@ -307,8 +341,69 @@ public partial class Form1 : Form
     {
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var rowIndex = panel.RowCount++;
-        panel.Controls.Add(new Label { Text = labelText, AutoSize = true, Margin = new Padding(3, 8, 3, 8) }, 0, rowIndex);
+        panel.Controls.Add(new Label { Text = labelText, AutoSize = true, Margin = new Padding(3, 10, 10, 8) }, 0, rowIndex);
         control.Dock = DockStyle.Top;
+        control.Margin = new Padding(3, 6, 3, 6);
         panel.Controls.Add(control, 1, rowIndex);
+    }
+
+    private static void ApplyTheme(Control root)
+    {
+        root.Font = BaseFont;
+        root.BackColor = AppBackground;
+        root.ForeColor = TextColor;
+        ApplyThemeRecursive(root);
+    }
+
+    private static void ApplyThemeRecursive(Control parent)
+    {
+        foreach (Control control in parent.Controls)
+        {
+            control.Font = BaseFont;
+            control.ForeColor = TextColor;
+
+            switch (control)
+            {
+                case GroupBox:
+                    control.BackColor = SurfaceBackground;
+                    control.Padding = new Padding(10);
+                    control.Margin = new Padding(6);
+                    break;
+                case TableLayoutPanel:
+                    control.BackColor = AppBackground;
+                    break;
+                case TabControl tabControl:
+                    tabControl.Padding = new Point(16, 8);
+                    tabControl.BackColor = AppBackground;
+                    break;
+                case TabPage tabPage:
+                    tabPage.BackColor = AppBackground;
+                    break;
+                case Label label:
+                    label.BackColor = Color.Transparent;
+                    if (label == parent.Controls[0] && parent is TableLayoutPanel)
+                    {
+                        label.ForeColor = TextColor;
+                    }
+
+                    if (label.Text.Contains("backend funkcionalitas", StringComparison.OrdinalIgnoreCase))
+                    {
+                        label.ForeColor = MutedTextColor;
+                    }
+
+                    break;
+                case TextBox textBox:
+                    textBox.BorderStyle = BorderStyle.FixedSingle;
+                    break;
+                case ComboBox comboBox:
+                    comboBox.FlatStyle = FlatStyle.Flat;
+                    break;
+                case DateTimePicker picker:
+                    picker.CalendarTitleBackColor = Color.FromArgb(219, 234, 254);
+                    break;
+            }
+
+            ApplyThemeRecursive(control);
+        }
     }
 }
