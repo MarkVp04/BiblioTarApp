@@ -34,6 +34,17 @@ public partial class Form1 : Form
     private Label _userHistoryInfoLabel = null!;
     private readonly List<UserBookMockItem> _userBooksData = new();
     private readonly List<UserHistoryMockItem> _userHistoryData = new();
+    private TextBox _librarianUserIdInput = null!;
+    private TextBox _librarianBookIdInput = null!;
+    private DateTimePicker _librarianDeadlinePicker = null!;
+    private Label _librarianLoanFeedbackLabel = null!;
+    private TextBox _librarianFineUserInput = null!;
+    private TextBox _librarianFineAmountInput = null!;
+    private TextBox _librarianFineNoteInput = null!;
+    private Label _librarianFineFeedbackLabel = null!;
+    private DataGridView _librarianLoansGrid = null!;
+    private readonly List<LibrarianLoanMockItem> _librarianLoansData = new();
+    private int _nextLibrarianLoanId = 1;
 
     public Form1()
     {
@@ -66,8 +77,10 @@ public partial class Form1 : Form
 
         ApplyTheme(root);
         SeedUserMockData();
+        SeedLibrarianMockData();
         RefreshUserBooksGrid(string.Empty);
         RefreshUserHistoryGrid();
+        RefreshLibrarianLoansGrid();
         ApplyRoleTabs("Felhasznalo");
     }
 
@@ -506,31 +519,278 @@ public partial class Form1 : Form
         tab.Controls.Add(layout);
 
         var loanGroup = new GroupBox { Text = "Kolcsonzes kezeles", Dock = DockStyle.Fill };
-        var loanForm = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
+        var loanOuter = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(12)
+        };
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var loanForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         loanForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
         loanForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddRow(loanForm, "Felhasznalo azonosito", new TextBox());
-        AddRow(loanForm, "Konyv azonosito", new TextBox());
-        AddRow(loanForm, "Hatarido", new DateTimePicker());
-        AddRow(loanForm, "", CreateButtonsRow("Kolcsonzes rogzitese", "Visszavetel"));
-        AddRow(loanForm, "", CreateButtonsRow("Hosszabbitas engedelyezese", "Hosszabbitas elutasitasa"));
-        loanGroup.Controls.Add(loanForm);
 
-        var fineGroup = new GroupBox { Text = "Birsag kezeles", Dock = DockStyle.Fill };
-        var fineForm = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
+        _librarianUserIdInput = new TextBox();
+        _librarianBookIdInput = new TextBox();
+        _librarianDeadlinePicker = new DateTimePicker { Format = DateTimePickerFormat.Short, MinDate = DateTime.Today };
+        AddRow(loanForm, "Felhasznalo ID *", _librarianUserIdInput);
+        AddRow(loanForm, "Konyv ID *", _librarianBookIdInput);
+        AddRow(loanForm, "Hatarido *", _librarianDeadlinePicker);
+
+        var loanButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        loanButtons.Controls.Add(CreatePrimaryButton("Kolcsonzes rogzitese", HandleLibrarianLoanCreateClick));
+        loanButtons.Controls.Add(CreatePrimaryButton("Visszavetel", HandleLibrarianReturnClick));
+        loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas engedelyezese", HandleLibrarianExtendApproveClick));
+        loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas elutasitasa", HandleLibrarianExtendDenyClick));
+
+        _librarianLoanFeedbackLabel = new Label
+        {
+            AutoSize = true,
+            Text = "Valassz sort a tablazatban (jobb oldal) vagy rogzits uj kolcsonzest.",
+            ForeColor = MutedTextColor
+        };
+
+        loanOuter.Controls.Add(loanForm, 0, 0);
+        loanOuter.Controls.Add(loanButtons, 0, 1);
+        loanOuter.Controls.Add(_librarianLoanFeedbackLabel, 0, 2);
+        loanGroup.Controls.Add(loanOuter);
+
+        var fineGroup = new GroupBox { Text = "Birsag es kolcsonzesek", Dock = DockStyle.Fill };
+        var fineOuter = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(12)
+        };
+        fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        fineOuter.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var fineForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         fineForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
         fineForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        AddRow(fineForm, "Felhasznalo azonosito", new TextBox());
-        AddRow(fineForm, "Osszeg", new TextBox());
-        AddRow(fineForm, "Megjegyzes", new TextBox());
-        AddRow(fineForm, "", CreateButtonsRow("Birsag kiszabasa", "Birsag torlese"));
-        fineForm.Controls.Add(new Label { Text = "Kolcsonzesek", AutoSize = true }, 0, 4);
-        fineForm.Controls.Add(CreateSampleGrid(new[] { "Felhasznalo", "Konyv", "Hatarido", "Keses napok" }), 1, 4);
-        fineGroup.Controls.Add(fineForm);
+        _librarianFineUserInput = new TextBox();
+        _librarianFineAmountInput = new TextBox();
+        _librarianFineNoteInput = new TextBox();
+        AddRow(fineForm, "Felhasznalo ID *", _librarianFineUserInput);
+        AddRow(fineForm, "Osszeg (Ft) *", _librarianFineAmountInput);
+        AddRow(fineForm, "Megjegyzes", _librarianFineNoteInput);
+
+        var fineButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        fineButtons.Controls.Add(CreatePrimaryButton("Birsag kiszabasa", HandleLibrarianFineCreateClick));
+        fineButtons.Controls.Add(CreatePrimaryButton("Birsag torlese (mock)", HandleLibrarianFineDeleteClick));
+
+        _librarianFineFeedbackLabel = new Label
+        {
+            AutoSize = true,
+            Text = "A birsag rogzitese a keseshez kotodik (mock).",
+            ForeColor = MutedTextColor
+        };
+
+        _librarianLoansGrid = CreateMockDataGrid();
+
+        fineOuter.Controls.Add(fineForm, 0, 0);
+        fineOuter.Controls.Add(fineButtons, 0, 1);
+        fineOuter.Controls.Add(_librarianFineFeedbackLabel, 0, 2);
+        fineOuter.Controls.Add(_librarianLoansGrid, 0, 3);
+        fineGroup.Controls.Add(fineOuter);
 
         layout.Controls.Add(loanGroup, 0, 0);
         layout.Controls.Add(fineGroup, 1, 0);
         return tab;
+    }
+
+    private void SeedLibrarianMockData()
+    {
+        if (_librarianLoansData.Count > 0)
+        {
+            return;
+        }
+
+        _librarianLoansData.AddRange(new[]
+        {
+            new LibrarianLoanMockItem(1, 101, 12, "Egri csillagok", DateTime.Today.AddDays(5), "Aktiv", 0, 0),
+            new LibrarianLoanMockItem(2, 102, 15, "Tuskevar", DateTime.Today.AddDays(-2), "Aktiv", 2, 1),
+            new LibrarianLoanMockItem(3, 103, 8, "A Pal utcai fiuk", DateTime.Today.AddDays(-10), "Lezart", 5, 2)
+        });
+        _nextLibrarianLoanId = 4;
+    }
+
+    private void RefreshLibrarianLoansGrid()
+    {
+        _librarianLoansGrid.DataSource = null;
+        _librarianLoansGrid.DataSource = _librarianLoansData.ToList();
+    }
+
+    private void SetLibrarianLoanFeedback(string text, bool isError = false)
+    {
+        _librarianLoanFeedbackLabel.Text = text;
+        _librarianLoanFeedbackLabel.ForeColor = isError ? Color.FromArgb(185, 28, 28) : MutedTextColor;
+    }
+
+    private void SetLibrarianFineFeedback(string text, bool isError = false)
+    {
+        _librarianFineFeedbackLabel.Text = text;
+        _librarianFineFeedbackLabel.ForeColor = isError ? Color.FromArgb(185, 28, 28) : MutedTextColor;
+    }
+
+    private LibrarianLoanMockItem? GetSelectedLibrarianLoan()
+    {
+        if (_librarianLoansGrid.CurrentRow?.DataBoundItem is LibrarianLoanMockItem item)
+        {
+            return item;
+        }
+
+        return null;
+    }
+
+    private void HandleLibrarianLoanCreateClick(object? sender, EventArgs e)
+    {
+        if (!int.TryParse(_librarianUserIdInput.Text.Trim(), out var userId) ||
+            !int.TryParse(_librarianBookIdInput.Text.Trim(), out var bookId))
+        {
+            SetLibrarianLoanFeedback("A felhasznalo es a konyv azonositoja egesz szam legyen.", true);
+            return;
+        }
+
+        var deadline = _librarianDeadlinePicker.Value.Date;
+        if (deadline < DateTime.Today)
+        {
+            SetLibrarianLoanFeedback("A hatarido nem lehet a multban.", true);
+            return;
+        }
+
+        var loan = new LibrarianLoanMockItem(
+            _nextLibrarianLoanId++,
+            userId,
+            bookId,
+            $"Konyv #{bookId} (mock)",
+            deadline,
+            "Aktiv",
+            0,
+            0);
+        _librarianLoansData.Add(loan);
+        RefreshLibrarianLoansGrid();
+        SetLibrarianLoanFeedback($"Uj kolcsonzes rogzitve (mock). ID: {loan.Id}.");
+        _statusLabel.Text = "Konyvtaros nezet: uj kolcsonzes (mock).";
+    }
+
+    private void HandleLibrarianReturnClick(object? sender, EventArgs e)
+    {
+        var selected = GetSelectedLibrarianLoan();
+        if (selected is null)
+        {
+            MessageBox.Show("Valassz egy kolcsonzest a tablazatbol.", "Visszavetel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
+        {
+            SetLibrarianLoanFeedback("Csak aktiv kolcsonzes adhato vissza.", true);
+            return;
+        }
+
+        var idx = _librarianLoansData.FindIndex(x => x.Id == selected.Id);
+        if (idx < 0)
+        {
+            return;
+        }
+
+        var keses = Math.Max(0, (DateTime.Today - selected.Hatarido.Date).Days);
+        _librarianLoansData[idx] = selected with { Statusz = "Lezart", KesesNapok = keses };
+        RefreshLibrarianLoansGrid();
+        SetLibrarianLoanFeedback($"Visszavetel rogzitve (mock). Keses: {keses} nap.");
+        _statusLabel.Text = "Konyvtaros nezet: visszavetel (mock).";
+    }
+
+    private void HandleLibrarianExtendApproveClick(object? sender, EventArgs e)
+    {
+        var selected = GetSelectedLibrarianLoan();
+        if (selected is null)
+        {
+            MessageBox.Show("Valassz egy kolcsonzest a hosszabbitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
+        {
+            SetLibrarianLoanFeedback("Csak aktiv kolcsonzes hosszabbithato.", true);
+            return;
+        }
+
+        if (selected.Hosszabbitasok >= 2)
+        {
+            SetLibrarianLoanFeedback("A kolcsonzes mar elerte a max 2 hosszabbitast.", true);
+            return;
+        }
+
+        var idx = _librarianLoansData.FindIndex(x => x.Id == selected.Id);
+        if (idx < 0)
+        {
+            return;
+        }
+
+        var newDeadline = selected.Hatarido.AddDays(7);
+        _librarianLoansData[idx] = selected with { Hatarido = newDeadline, Hosszabbitasok = selected.Hosszabbitasok + 1 };
+        RefreshLibrarianLoansGrid();
+        SetLibrarianLoanFeedback($"Hosszabbitas engedelyezve (mock). Uj hatarido: {newDeadline:yyyy-MM-dd}.");
+        _statusLabel.Text = "Konyvtaros nezet: hosszabbitas engedelyezve (mock).";
+    }
+
+    private void HandleLibrarianExtendDenyClick(object? sender, EventArgs e)
+    {
+        if (GetSelectedLibrarianLoan() is null)
+        {
+            MessageBox.Show("Valassz egy kolcsonzest az elutasitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        MessageBox.Show("A hosszabbitas elutasitva (mock). Backend bekotes kesobb.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        SetLibrarianLoanFeedback("Hosszabbitas elutasitva (mock).");
+        _statusLabel.Text = "Konyvtaros nezet: hosszabbitas elutasitva (mock).";
+    }
+
+    private void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
+    {
+        if (!int.TryParse(_librarianFineUserInput.Text.Trim(), out _))
+        {
+            SetLibrarianFineFeedback("A felhasznalo azonositoja egesz szam legyen.", true);
+            return;
+        }
+
+        if (!decimal.TryParse(_librarianFineAmountInput.Text.Trim(), out var amount) || amount <= 0)
+        {
+            SetLibrarianFineFeedback("Adj meg ervenyes, pozitiv osszeget.", true);
+            return;
+        }
+
+        SetLibrarianFineFeedback($"Birsag kiszabva (mock): {amount} Ft. Megjegyzes: {_librarianFineNoteInput.Text.Trim()}");
+        _statusLabel.Text = "Konyvtaros nezet: birsag rogzites (mock).";
+    }
+
+    private void HandleLibrarianFineDeleteClick(object? sender, EventArgs e)
+    {
+        MessageBox.Show("A birsag torlese a backendhez lesz kotve (mock).", "Birsag", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        SetLibrarianFineFeedback("Birsag torles (mock) — nincs valtozas a listaban.");
+        _statusLabel.Text = "Konyvtaros nezet: birsag torles (mock).";
     }
 
     private TabPage BuildAdminTab()
@@ -700,6 +960,30 @@ public partial class Form1 : Form
         return grid;
     }
 
+    private static DataGridView CreateMockDataGrid()
+    {
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoGenerateColumns = true
+        };
+        grid.BackgroundColor = SurfaceBackground;
+        grid.BorderStyle = BorderStyle.None;
+        grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(239, 246, 255);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = TextColor;
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font(BaseFont, FontStyle.Bold);
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
+        grid.DefaultCellStyle.SelectionForeColor = Color.Black;
+        grid.RowHeadersVisible = false;
+        return grid;
+    }
+
     private static void AddRow(TableLayoutPanel panel, string labelText, Control control)
     {
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -774,3 +1058,13 @@ public partial class Form1 : Form
 internal sealed record UserBookMockItem(string Cim, string Szerzo, string Kategoria, int Kiadasev, bool Elerheto);
 
 internal sealed record UserHistoryMockItem(string Konyv, string KolcsonzesDatuma, string Hatarido, string Statusz, int Hosszabbitasok);
+
+internal sealed record LibrarianLoanMockItem(
+    int Id,
+    int FelhasznaloId,
+    int KonyvId,
+    string KonyvCim,
+    DateTime Hatarido,
+    string Statusz,
+    int KesesNapok,
+    int Hosszabbitasok);
