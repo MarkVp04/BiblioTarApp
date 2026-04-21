@@ -27,6 +27,13 @@ public partial class Form1 : Form
     private TextBox _registerPasswordAgainInput = null!;
     private ComboBox _registerRoleInput = null!;
     private Label _registerValidationLabel = null!;
+    private TextBox _userSearchInput = null!;
+    private DataGridView _userBooksGrid = null!;
+    private DataGridView _userHistoryGrid = null!;
+    private Label _userBooksInfoLabel = null!;
+    private Label _userHistoryInfoLabel = null!;
+    private readonly List<UserBookMockItem> _userBooksData = new();
+    private readonly List<UserHistoryMockItem> _userHistoryData = new();
 
     public Form1()
     {
@@ -58,6 +65,9 @@ public partial class Form1 : Form
         root.Controls.Add(_statusLabel, 0, 2);
 
         ApplyTheme(root);
+        SeedUserMockData();
+        RefreshUserBooksGrid(string.Empty);
+        RefreshUserHistoryGrid();
         ApplyRoleTabs("Felhasznalo");
     }
 
@@ -305,13 +315,32 @@ public partial class Form1 : Form
         tab.Controls.Add(layout);
 
         var booksGroup = new GroupBox { Text = "Konyvkereses es elojegyzes", Dock = DockStyle.Fill };
-        var booksPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8) };
+        var booksPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(8) };
         booksPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         booksPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         booksPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        booksPanel.Controls.Add(new TextBox { PlaceholderText = "Kereses cim/szerzo/kategoria alapjan..." }, 0, 0);
-        booksPanel.Controls.Add(CreateSampleGrid(new[] { "Cim", "Szerzo", "Kiadas eve", "Elerheto" }), 0, 1);
-        booksPanel.Controls.Add(CreateButtonsRow("Kereses", "Reszletek", "Elojegyzes"), 0, 2);
+        booksPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _userSearchInput = new TextBox { PlaceholderText = "Kereses cim/szerzo/kategoria alapjan..." };
+        _userBooksGrid = CreateSampleGrid(new[] { "Cim", "Szerzo", "Kategoria", "Kiadas eve", "Elerheto" });
+        _userBooksInfoLabel = new Label { AutoSize = true };
+
+        var booksActionRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        booksActionRow.Controls.Add(CreatePrimaryButton("Kereses", HandleUserSearchClick));
+        booksActionRow.Controls.Add(CreatePrimaryButton("Szuro torlese", HandleUserClearSearchClick));
+        booksActionRow.Controls.Add(CreatePrimaryButton("Reszletek", HandleUserDetailsClick));
+        booksActionRow.Controls.Add(CreatePrimaryButton("Elojegyzes", HandleUserReserveClick));
+
+        booksPanel.Controls.Add(_userSearchInput, 0, 0);
+        booksPanel.Controls.Add(_userBooksGrid, 0, 1);
+        booksPanel.Controls.Add(booksActionRow, 0, 2);
+        booksPanel.Controls.Add(_userBooksInfoLabel, 0, 3);
         booksGroup.Controls.Add(booksPanel);
 
         var profileGroup = new GroupBox { Text = "Sajat adatok", Dock = DockStyle.Fill };
@@ -326,17 +355,148 @@ public partial class Form1 : Form
         profileGroup.Controls.Add(profileForm);
 
         var historyGroup = new GroupBox { Text = "Kolcsonzesi elozmenyek", Dock = DockStyle.Fill };
-        var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8) };
+        var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8) };
         historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         historyPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        historyPanel.Controls.Add(CreateSampleGrid(new[] { "Konyv", "Kolcsonzes datuma", "Hatarido", "Statusz" }), 0, 0);
-        historyPanel.Controls.Add(CreateButtonsRow("Frissites", "Hosszabbitas (max 2x)"), 0, 1);
+        historyPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _userHistoryGrid = CreateSampleGrid(new[] { "Konyv", "Kolcsonzes datuma", "Hatarido", "Statusz", "Hosszabbitasok" });
+        _userHistoryInfoLabel = new Label { AutoSize = true };
+        var historyActionRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        historyActionRow.Controls.Add(CreatePrimaryButton("Frissites", HandleUserHistoryRefreshClick));
+        historyActionRow.Controls.Add(CreatePrimaryButton("Hosszabbitas (max 2x)", HandleUserHistoryExtendClick));
+        historyPanel.Controls.Add(_userHistoryGrid, 0, 0);
+        historyPanel.Controls.Add(historyActionRow, 0, 1);
+        historyPanel.Controls.Add(_userHistoryInfoLabel, 0, 2);
         historyGroup.Controls.Add(historyPanel);
 
         layout.Controls.Add(booksGroup, 0, 0);
         layout.Controls.Add(profileGroup, 0, 1);
         layout.Controls.Add(historyGroup, 0, 2);
         return tab;
+    }
+
+    private void HandleUserSearchClick(object? sender, EventArgs e)
+    {
+        RefreshUserBooksGrid(_userSearchInput.Text);
+        _statusLabel.Text = "Felhasznalo nezet: kereses lefutott (mock).";
+    }
+
+    private void HandleUserClearSearchClick(object? sender, EventArgs e)
+    {
+        _userSearchInput.Clear();
+        RefreshUserBooksGrid(string.Empty);
+        _statusLabel.Text = "Felhasznalo nezet: szuro torolve.";
+    }
+
+    private void HandleUserDetailsClick(object? sender, EventArgs e)
+    {
+        if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
+        {
+            MessageBox.Show("Valassz egy konyvet a reszletekhez.", "Reszletek", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var details = $"Cim: {selected.Cim}\nSzerzo: {selected.Szerzo}\nKategoria: {selected.Kategoria}\nKiadas eve: {selected.Kiadasev}\nElerheto: {(selected.Elerheto ? "Igen" : "Nem")}";
+        MessageBox.Show(details, "Konyv reszletek (mock)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void HandleUserReserveClick(object? sender, EventArgs e)
+    {
+        if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
+        {
+            MessageBox.Show("Valassz egy konyvet az elojegyzeshez.", "Elojegyzes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var info = selected.Elerheto
+            ? "A konyv elerheto, az elojegyzes funkcio backendre var."
+            : "A konyv jelenleg nem elerheto, az elojegyzes funkcio backendre var.";
+        MessageBox.Show(info, "Elojegyzes (mock)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void RefreshUserBooksGrid(string? query)
+    {
+        var search = query?.Trim() ?? string.Empty;
+        var filtered = string.IsNullOrWhiteSpace(search)
+            ? _userBooksData.ToList()
+            : _userBooksData.Where(x =>
+                x.Cim.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                x.Szerzo.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                x.Kategoria.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        _userBooksGrid.DataSource = filtered;
+        _userBooksInfoLabel.Text = filtered.Count == 0
+            ? "Nincs talalat a megadott keresesi feltetelre."
+            : $"Talalatok: {filtered.Count} / {_userBooksData.Count}";
+    }
+
+    private void RefreshUserHistoryGrid()
+    {
+        _userHistoryGrid.DataSource = _userHistoryData.ToList();
+        _userHistoryInfoLabel.Text = _userHistoryData.Count == 0
+            ? "Nincs meg kolcsonzesi elozmeny."
+            : $"Kolcsonzesi tetelszam: {_userHistoryData.Count}";
+    }
+
+    private void SeedUserMockData()
+    {
+        if (_userBooksData.Count > 0 || _userHistoryData.Count > 0)
+        {
+            return;
+        }
+
+        _userBooksData.AddRange(new[]
+        {
+            new UserBookMockItem("A Pal utcai fiuk", "Molnar Ferenc", "Ifjusagi", 1907, true),
+            new UserBookMockItem("Egri csillagok", "Gardonyi Geza", "Tortenelmi", 1899, false),
+            new UserBookMockItem("Az ember tragediaja", "Madach Imre", "Drama", 1862, true),
+            new UserBookMockItem("Szent Peter esernyoje", "Mikszath Kalman", "Regeny", 1895, true),
+            new UserBookMockItem("Tuskevar", "Fekete Istvan", "Ifjusagi", 1957, false)
+        });
+
+        _userHistoryData.AddRange(new[]
+        {
+            new UserHistoryMockItem("A Pal utcai fiuk", "2026-04-01", "2026-04-15", "Lezart", 1),
+            new UserHistoryMockItem("Egri csillagok", "2026-04-08", "2026-04-22", "Aktiv", 0),
+            new UserHistoryMockItem("Tuskevar", "2026-03-01", "2026-03-15", "Lezart", 2)
+        });
+    }
+
+    private void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
+    {
+        RefreshUserHistoryGrid();
+        _statusLabel.Text = "Felhasznalo nezet: kolcsonzesi lista frissitve (mock).";
+    }
+
+    private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
+    {
+        if (_userHistoryGrid.CurrentRow?.DataBoundItem is not UserHistoryMockItem selected)
+        {
+            MessageBox.Show("Valassz kolcsonzest a hosszabbitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Csak aktiv kolcsonzes hosszabbithato.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (selected.Hosszabbitasok >= 2)
+        {
+            MessageBox.Show("A kolcsonzes mar elerte a max 2 hosszabbitast.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        MessageBox.Show("A hosszabbitas kerese rogzitve (mock). Backend bekotes kesobb.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        _statusLabel.Text = "Felhasznalo nezet: hosszabbitas kerese elokeszitve (mock).";
     }
 
     private TabPage BuildLibrarianTab()
@@ -610,3 +770,7 @@ public partial class Form1 : Form
         }
     }
 }
+
+internal sealed record UserBookMockItem(string Cim, string Szerzo, string Kategoria, int Kiadasev, bool Elerheto);
+
+internal sealed record UserHistoryMockItem(string Konyv, string KolcsonzesDatuma, string Hatarido, string Statusz, int Hosszabbitasok);
