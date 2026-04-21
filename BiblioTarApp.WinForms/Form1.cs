@@ -2,41 +2,78 @@ namespace BiblioTarApp.WinForms;
 
 public partial class Form1 : Form
 {
+    private Label _statusLabel = null!;
+
     public Form1()
     {
         InitializeComponent();
-        BuildGuiSkeleton();
+        BuildUiStructure();
     }
 
-    private void BuildGuiSkeleton()
+    private void BuildUiStructure()
+    {
+        var root = CreateRootLayout();
+        Controls.Add(root);
+
+        root.Controls.Add(CreateHeaderSection(), 0, 0);
+
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        tabs.TabPages.Add(BuildAuthTab());
+        tabs.TabPages.Add(BuildUserTab());
+        tabs.TabPages.Add(BuildLibrarianTab());
+        tabs.TabPages.Add(BuildAdminTab());
+        root.Controls.Add(tabs, 0, 1);
+
+        _statusLabel = new Label
+        {
+            AutoSize = true,
+            Text = "UI vaz kesz. Funkciok implementalasa kesobb.",
+            Margin = new Padding(3, 8, 3, 8)
+        };
+        root.Controls.Add(_statusLabel, 0, 2);
+    }
+
+    private static TableLayoutPanel CreateRootLayout()
     {
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Padding = new Padding(12)
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        Controls.Add(root);
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        return root;
+    }
 
-        var header = new Label
+    private static Control CreateHeaderSection()
+    {
+        var headerPanel = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            Margin = new Padding(0, 0, 0, 8)
+        };
+        headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        headerPanel.Controls.Add(new Label
+        {
             AutoSize = true,
             Font = new Font("Segoe UI", 13, FontStyle.Bold),
-            Text = "BiblioTarApp - teljes GUI vaz (funkciok kesobb)"
-        };
-        root.Controls.Add(header, 0, 0);
+            Text = "BiblioTarApp - Teljes GUI vaz"
+        }, 0, 0);
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
-        root.Controls.Add(tabs, 0, 1);
+        headerPanel.Controls.Add(new Label
+        {
+            AutoSize = true,
+            Text = "Szerepkoronkent elokeszitett feluletek, backend funkcionalitas nelkul."
+        }, 0, 1);
 
-        tabs.TabPages.Add(BuildAuthTab());
-        tabs.TabPages.Add(BuildUserTab());
-        tabs.TabPages.Add(BuildLibrarianTab());
-        tabs.TabPages.Add(BuildAdminTab());
+        return headerPanel;
     }
 
     private TabPage BuildAuthTab()
@@ -212,6 +249,7 @@ public partial class Form1 : Form
             RowCount = 1,
             Padding = new Padding(8)
         };
+
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
