@@ -17,6 +17,16 @@ public partial class Form1 : Form
     private TabPage _userTab = null!;
     private TabPage _librarianTab = null!;
     private TabPage _adminTab = null!;
+    private TextBox _loginEmailInput = null!;
+    private TextBox _loginPasswordInput = null!;
+    private Label _loginValidationLabel = null!;
+    private TextBox _registerNameInput = null!;
+    private TextBox _registerEmailInput = null!;
+    private TextBox _registerPhoneInput = null!;
+    private TextBox _registerPasswordInput = null!;
+    private TextBox _registerPasswordAgainInput = null!;
+    private ComboBox _registerRoleInput = null!;
+    private Label _registerValidationLabel = null!;
 
     public Form1()
     {
@@ -177,11 +187,16 @@ public partial class Form1 : Form
         loginForm.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         loginForm.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        loginForm.Controls.Add(new Label { Text = "Email", AutoSize = true }, 0, 0);
-        loginForm.Controls.Add(new TextBox { Dock = DockStyle.Top }, 1, 0);
-        loginForm.Controls.Add(new Label { Text = "Jelszo", AutoSize = true }, 0, 1);
-        loginForm.Controls.Add(new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true }, 1, 1);
-        loginForm.Controls.Add(CreateActionButton("Bejelentkezes"), 1, 2);
+        _loginEmailInput = new TextBox { Dock = DockStyle.Top };
+        _loginPasswordInput = new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true };
+        _loginValidationLabel = CreateValidationLabel();
+
+        loginForm.Controls.Add(CreateRequiredLabel("Email"), 0, 0);
+        loginForm.Controls.Add(_loginEmailInput, 1, 0);
+        loginForm.Controls.Add(CreateRequiredLabel("Jelszo"), 0, 1);
+        loginForm.Controls.Add(_loginPasswordInput, 1, 1);
+        loginForm.Controls.Add(CreatePrimaryButton("Bejelentkezes", HandleLoginClick), 1, 2);
+        loginForm.Controls.Add(_loginValidationLabel, 1, 3);
         loginGroup.Controls.Add(loginForm);
 
         var registerGroup = new GroupBox { Text = "Regisztracio", Dock = DockStyle.Fill };
@@ -189,23 +204,95 @@ public partial class Form1 : Form
         registerForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         registerForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        AddRow(registerForm, "Nev", new TextBox());
-        AddRow(registerForm, "Email", new TextBox());
-        AddRow(registerForm, "Telefon", new TextBox());
-        AddRow(registerForm, "Jelszo", new TextBox { UseSystemPasswordChar = true });
-        AddRow(registerForm, "Jelszo ujra", new TextBox { UseSystemPasswordChar = true });
-        AddRow(registerForm, "Szerepkor", new ComboBox
+        _registerNameInput = new TextBox();
+        _registerEmailInput = new TextBox();
+        _registerPhoneInput = new TextBox();
+        _registerPasswordInput = new TextBox { UseSystemPasswordChar = true };
+        _registerPasswordAgainInput = new TextBox { UseSystemPasswordChar = true };
+        _registerRoleInput = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             DataSource = new[] { "Felhasznalo", "Konyvtaros", "Adminisztrator" }
-        });
-        AddRow(registerForm, "", CreateActionButton("Regisztracio"));
+        };
+        _registerValidationLabel = CreateValidationLabel();
+
+        AddRow(registerForm, "Nev *", _registerNameInput);
+        AddRow(registerForm, "Email *", _registerEmailInput);
+        AddRow(registerForm, "Telefon *", _registerPhoneInput);
+        AddRow(registerForm, "Jelszo *", _registerPasswordInput);
+        AddRow(registerForm, "Jelszo ujra *", _registerPasswordAgainInput);
+        AddRow(registerForm, "Szerepkor *", _registerRoleInput);
+        AddRow(registerForm, "", CreatePrimaryButton("Regisztracio", HandleRegisterClick));
+        AddRow(registerForm, "", _registerValidationLabel);
 
         registerGroup.Controls.Add(registerForm);
 
         layout.Controls.Add(loginGroup, 0, 0);
         layout.Controls.Add(registerGroup, 1, 0);
         return tab;
+    }
+
+    private void HandleLoginClick(object? sender, EventArgs e)
+    {
+        var email = _loginEmailInput.Text.Trim();
+        var password = _loginPasswordInput.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            _loginValidationLabel.Text = "Toltsd ki az osszes kotelezo mezot.";
+            return;
+        }
+
+        if (!LooksLikeEmail(email))
+        {
+            _loginValidationLabel.Text = "Adj meg ervenyes email cimet.";
+            return;
+        }
+
+        _loginValidationLabel.Text = "Validacio rendben. Login funkcio kesobb lesz bekotve.";
+        _statusLabel.Text = "Auth UI: Bejelentkezes validacio kesz.";
+    }
+
+    private void HandleRegisterClick(object? sender, EventArgs e)
+    {
+        var name = _registerNameInput.Text.Trim();
+        var email = _registerEmailInput.Text.Trim();
+        var phone = _registerPhoneInput.Text.Trim();
+        var password = _registerPasswordInput.Text.Trim();
+        var passwordAgain = _registerPasswordAgainInput.Text.Trim();
+        var role = _registerRoleInput.SelectedItem?.ToString();
+
+        if (string.IsNullOrWhiteSpace(name) ||
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(phone) ||
+            string.IsNullOrWhiteSpace(password) ||
+            string.IsNullOrWhiteSpace(passwordAgain) ||
+            string.IsNullOrWhiteSpace(role))
+        {
+            _registerValidationLabel.Text = "Toltsd ki az osszes kotelezo mezot.";
+            return;
+        }
+
+        if (!LooksLikeEmail(email))
+        {
+            _registerValidationLabel.Text = "Az email formatuma nem megfelelo.";
+            return;
+        }
+
+        if (password.Length < 6)
+        {
+            _registerValidationLabel.Text = "A jelszo legalabb 6 karakter legyen.";
+            return;
+        }
+
+        if (!string.Equals(password, passwordAgain, StringComparison.Ordinal))
+        {
+            _registerValidationLabel.Text = "A ket jelszo nem egyezik.";
+            return;
+        }
+
+        _registerValidationLabel.Text = "Validacio rendben. Regisztracio funkcio kesobb lesz bekotve.";
+        _statusLabel.Text = "Auth UI: Regisztracio validacio kesz.";
     }
 
     private TabPage BuildUserTab()
@@ -382,6 +469,45 @@ public partial class Form1 : Form
             MessageBox.Show("Ez a funkcio meg nincs implementalva.", "GUI vaz", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         return button;
+    }
+
+    private static Button CreatePrimaryButton(string text, EventHandler onClick)
+    {
+        var button = new Button
+        {
+            AutoSize = true,
+            Text = text,
+            Padding = new Padding(10, 5, 10, 5),
+            Margin = new Padding(0, 0, 8, 8),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = Color.White,
+            BackColor = PrimaryColor
+        };
+
+        button.FlatAppearance.BorderSize = 0;
+        button.Click += onClick;
+        return button;
+    }
+
+    private static Label CreateRequiredLabel(string text)
+    {
+        return new Label { Text = $"{text} *", AutoSize = true };
+    }
+
+    private static Label CreateValidationLabel()
+    {
+        return new Label
+        {
+            AutoSize = true,
+            Text = "Kotelezo mezok: *",
+            ForeColor = Color.FromArgb(185, 28, 28),
+            Margin = new Padding(0, 4, 0, 0)
+        };
+    }
+
+    private static bool LooksLikeEmail(string email)
+    {
+        return email.Contains('@') && email.Contains('.');
     }
 
     private static DataGridView CreateSampleGrid(string[] columns)
