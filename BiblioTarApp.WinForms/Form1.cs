@@ -11,6 +11,12 @@ public partial class Form1 : Form
     private static readonly Font HeaderFont = new("Segoe UI", 13F, FontStyle.Bold);
 
     private Label _statusLabel = null!;
+    private ComboBox _roleSelector = null!;
+    private TabControl _mainTabs = null!;
+    private TabPage _authTab = null!;
+    private TabPage _userTab = null!;
+    private TabPage _librarianTab = null!;
+    private TabPage _adminTab = null!;
 
     public Form1()
     {
@@ -25,12 +31,13 @@ public partial class Form1 : Form
 
         root.Controls.Add(CreateHeaderSection(), 0, 0);
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
-        tabs.TabPages.Add(BuildAuthTab());
-        tabs.TabPages.Add(BuildUserTab());
-        tabs.TabPages.Add(BuildLibrarianTab());
-        tabs.TabPages.Add(BuildAdminTab());
-        root.Controls.Add(tabs, 0, 1);
+        _authTab = BuildAuthTab();
+        _userTab = BuildUserTab();
+        _librarianTab = BuildLibrarianTab();
+        _adminTab = BuildAdminTab();
+
+        _mainTabs = new TabControl { Dock = DockStyle.Fill };
+        root.Controls.Add(_mainTabs, 0, 1);
 
         _statusLabel = new Label
         {
@@ -41,6 +48,7 @@ public partial class Form1 : Form
         root.Controls.Add(_statusLabel, 0, 2);
 
         ApplyTheme(root);
+        ApplyRoleTabs("Felhasznalo");
     }
 
     private static TableLayoutPanel CreateRootLayout()
@@ -58,32 +66,101 @@ public partial class Form1 : Form
         return root;
     }
 
-    private static Control CreateHeaderSection()
+    private Control CreateHeaderSection()
     {
         var headerPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 1,
+            ColumnCount = 2,
             Margin = new Padding(0, 0, 0, 8)
         };
+        headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        headerPanel.Controls.Add(new Label
+        var titlePanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ColumnCount = 1
+        };
+        titlePanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        titlePanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        titlePanel.Controls.Add(new Label
         {
             AutoSize = true,
             Font = HeaderFont,
             Text = "BiblioTarApp - Teljes GUI vaz"
         }, 0, 0);
 
-        headerPanel.Controls.Add(new Label
+        titlePanel.Controls.Add(new Label
         {
             AutoSize = true,
             Text = "Szerepkoronkent elokeszitett feluletek, backend funkcionalitas nelkul."
         }, 0, 1);
 
+        var rolePanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Padding = new Padding(0),
+            Margin = new Padding(12, 0, 0, 0)
+        };
+        rolePanel.Controls.Add(new Label { AutoSize = true, Text = "Aktiv szerepkor" });
+        _roleSelector = new ComboBox
+        {
+            Width = 180,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        _roleSelector.Items.AddRange(new object[] { "Felhasznalo", "Konyvtaros", "Adminisztrator" });
+        _roleSelector.SelectedIndex = 0;
+        _roleSelector.SelectedIndexChanged += (_, _) => ApplyRoleTabs(_roleSelector.SelectedItem?.ToString());
+        rolePanel.Controls.Add(_roleSelector);
+
+        headerPanel.Controls.Add(titlePanel, 0, 0);
+        headerPanel.SetRowSpan(titlePanel, 2);
+        headerPanel.Controls.Add(rolePanel, 1, 0);
         return headerPanel;
+    }
+
+    private void ApplyRoleTabs(string? role)
+    {
+        if (_mainTabs is null)
+        {
+            return;
+        }
+
+        var selectedRole = string.IsNullOrWhiteSpace(role) ? "Felhasznalo" : role;
+
+        _mainTabs.SuspendLayout();
+        _mainTabs.TabPages.Clear();
+        _mainTabs.TabPages.Add(_authTab);
+
+        switch (selectedRole)
+        {
+            case "Konyvtaros":
+                _mainTabs.TabPages.Add(_librarianTab);
+                _mainTabs.SelectedTab = _librarianTab;
+                _statusLabel.Text = "Aktiv nezet: Konyvtaros";
+                break;
+            case "Adminisztrator":
+                _mainTabs.TabPages.Add(_adminTab);
+                _mainTabs.SelectedTab = _adminTab;
+                _statusLabel.Text = "Aktiv nezet: Adminisztrator";
+                break;
+            default:
+                _mainTabs.TabPages.Add(_userTab);
+                _mainTabs.SelectedTab = _userTab;
+                _statusLabel.Text = "Aktiv nezet: Felhasznalo";
+                break;
+        }
+
+        _mainTabs.ResumeLayout();
     }
 
     private TabPage BuildAuthTab()
