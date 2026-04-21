@@ -195,22 +195,51 @@ public partial class Form1 : Form
             case "Konyvtaros":
                 _mainTabs.TabPages.Add(_librarianTab);
                 _mainTabs.SelectedTab = _librarianTab;
-                _statusLabel.Text = "Aktiv nezet: Konyvtaros";
+                SetStatusBar("Aktiv nezet: Konyvtaros");
                 break;
             case "Adminisztrator":
                 _mainTabs.TabPages.Add(_adminTab);
                 _mainTabs.SelectedTab = _adminTab;
-                _statusLabel.Text = "Aktiv nezet: Adminisztrator";
+                SetStatusBar("Aktiv nezet: Adminisztrator");
                 break;
             default:
                 _mainTabs.TabPages.Add(_userTab);
                 _mainTabs.SelectedTab = _userTab;
-                _statusLabel.Text = "Aktiv nezet: Felhasznalo";
+                SetStatusBar("Aktiv nezet: Felhasznalo");
                 break;
         }
 
         _mainTabs.ResumeLayout();
     }
+
+    private enum StatusTone
+    {
+        Neutral,
+        Success,
+        Warning,
+        Error
+    }
+
+    private void SetStatusBar(string message, StatusTone tone = StatusTone.Neutral)
+    {
+        _statusLabel.Text = message;
+        _statusLabel.ForeColor = tone switch
+        {
+            StatusTone.Success => Color.FromArgb(22, 163, 74),
+            StatusTone.Warning => Color.FromArgb(180, 83, 9),
+            StatusTone.Error => Color.FromArgb(185, 28, 28),
+            _ => TextColor
+        };
+    }
+
+    private static void NotifyInfo(string title, string message) =>
+        MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+    private static void NotifyWarning(string title, string message) =>
+        MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    private static bool ConfirmWarning(string title, string message) =>
+        MessageBox.Show(message, title, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
 
     private TabPage BuildAuthTab()
     {
@@ -289,7 +318,7 @@ public partial class Form1 : Form
         }
 
         _loginValidationLabel.Text = "Validacio rendben. Login funkcio kesobb lesz bekotve.";
-        _statusLabel.Text = "Auth UI: Bejelentkezes validacio kesz.";
+        SetStatusBar("Auth UI: Bejelentkezes validacio kesz.", StatusTone.Success);
     }
 
     private void HandleRegisterClick(object? sender, EventArgs e)
@@ -331,7 +360,7 @@ public partial class Form1 : Form
         }
 
         _registerValidationLabel.Text = "Validacio rendben. Regisztracio funkcio kesobb lesz bekotve.";
-        _statusLabel.Text = "Auth UI: Regisztracio validacio kesz.";
+        SetStatusBar("Auth UI: Regisztracio validacio kesz.", StatusTone.Success);
     }
 
     private TabPage BuildUserTab()
@@ -413,40 +442,40 @@ public partial class Form1 : Form
     private void HandleUserSearchClick(object? sender, EventArgs e)
     {
         RefreshUserBooksGrid(_userSearchInput.Text);
-        _statusLabel.Text = "Felhasznalo nezet: kereses lefutott (mock).";
+        SetStatusBar("Felhasznalo nezet: kereses lefutott (mock).", StatusTone.Success);
     }
 
     private void HandleUserClearSearchClick(object? sender, EventArgs e)
     {
         _userSearchInput.Clear();
         RefreshUserBooksGrid(string.Empty);
-        _statusLabel.Text = "Felhasznalo nezet: szuro torolve.";
+        SetStatusBar("Felhasznalo nezet: szuro torolve.");
     }
 
     private void HandleUserDetailsClick(object? sender, EventArgs e)
     {
         if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
         {
-            MessageBox.Show("Valassz egy konyvet a reszletekhez.", "Reszletek", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Reszletek", "Valassz egy konyvet a reszletekhez.");
             return;
         }
 
         var details = $"Cim: {selected.Cim}\nSzerzo: {selected.Szerzo}\nKategoria: {selected.Kategoria}\nKiadas eve: {selected.Kiadasev}\nElerheto: {(selected.Elerheto ? "Igen" : "Nem")}";
-        MessageBox.Show(details, "Konyv reszletek (mock)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        NotifyInfo("Konyv reszletek (mock)", details);
     }
 
     private void HandleUserReserveClick(object? sender, EventArgs e)
     {
         if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
         {
-            MessageBox.Show("Valassz egy konyvet az elojegyzeshez.", "Elojegyzes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Elojegyzes", "Valassz egy konyvet az elojegyzeshez.");
             return;
         }
 
         var info = selected.Elerheto
             ? "A konyv elerheto, az elojegyzes funkcio backendre var."
             : "A konyv jelenleg nem elerheto, az elojegyzes funkcio backendre var.";
-        MessageBox.Show(info, "Elojegyzes (mock)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        NotifyInfo("Elojegyzes (mock)", info);
     }
 
     private void RefreshUserBooksGrid(string? query)
@@ -501,31 +530,31 @@ public partial class Form1 : Form
     private void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
     {
         RefreshUserHistoryGrid();
-        _statusLabel.Text = "Felhasznalo nezet: kolcsonzesi lista frissitve (mock).";
+        SetStatusBar("Felhasznalo nezet: kolcsonzesi lista frissitve (mock).", StatusTone.Success);
     }
 
     private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
     {
         if (_userHistoryGrid.CurrentRow?.DataBoundItem is not UserHistoryMockItem selected)
         {
-            MessageBox.Show("Valassz kolcsonzest a hosszabbitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Hosszabbitas", "Valassz kolcsonzest a hosszabbitashoz.");
             return;
         }
 
         if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
         {
-            MessageBox.Show("Csak aktiv kolcsonzes hosszabbithato.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            NotifyWarning("Hosszabbitas", "Csak aktiv kolcsonzes hosszabbithato.");
             return;
         }
 
         if (selected.Hosszabbitasok >= 2)
         {
-            MessageBox.Show("A kolcsonzes mar elerte a max 2 hosszabbitast.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            NotifyWarning("Hosszabbitas", "A kolcsonzes mar elerte a max 2 hosszabbitast.");
             return;
         }
 
-        MessageBox.Show("A hosszabbitas kerese rogzitve (mock). Backend bekotes kesobb.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        _statusLabel.Text = "Felhasznalo nezet: hosszabbitas kerese elokeszitve (mock).";
+        NotifyInfo("Hosszabbitas", "A hosszabbitas kerese rogzitve (mock). Backend bekotes kesobb.");
+        SetStatusBar("Felhasznalo nezet: hosszabbitas kerese elokeszitve (mock).", StatusTone.Success);
     }
 
     private TabPage BuildLibrarianTab()
@@ -706,7 +735,7 @@ public partial class Form1 : Form
         _librarianLoansData.Add(loan);
         RefreshLibrarianLoansGrid();
         SetLibrarianLoanFeedback($"Uj kolcsonzes rogzitve (mock). ID: {loan.Id}.");
-        _statusLabel.Text = "Konyvtaros nezet: uj kolcsonzes (mock).";
+        SetStatusBar("Konyvtaros nezet: uj kolcsonzes (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianReturnClick(object? sender, EventArgs e)
@@ -714,7 +743,7 @@ public partial class Form1 : Form
         var selected = GetSelectedLibrarianLoan();
         if (selected is null)
         {
-            MessageBox.Show("Valassz egy kolcsonzest a tablazatbol.", "Visszavetel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Visszavetel", "Valassz egy kolcsonzest a tablazatbol.");
             return;
         }
 
@@ -734,7 +763,7 @@ public partial class Form1 : Form
         _librarianLoansData[idx] = selected with { Statusz = "Lezart", KesesNapok = keses };
         RefreshLibrarianLoansGrid();
         SetLibrarianLoanFeedback($"Visszavetel rogzitve (mock). Keses: {keses} nap.");
-        _statusLabel.Text = "Konyvtaros nezet: visszavetel (mock).";
+        SetStatusBar("Konyvtaros nezet: visszavetel (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianExtendApproveClick(object? sender, EventArgs e)
@@ -742,7 +771,7 @@ public partial class Form1 : Form
         var selected = GetSelectedLibrarianLoan();
         if (selected is null)
         {
-            MessageBox.Show("Valassz egy kolcsonzest a hosszabbitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Hosszabbitas", "Valassz egy kolcsonzest a hosszabbitashoz.");
             return;
         }
 
@@ -768,20 +797,20 @@ public partial class Form1 : Form
         _librarianLoansData[idx] = selected with { Hatarido = newDeadline, Hosszabbitasok = selected.Hosszabbitasok + 1 };
         RefreshLibrarianLoansGrid();
         SetLibrarianLoanFeedback($"Hosszabbitas engedelyezve (mock). Uj hatarido: {newDeadline:yyyy-MM-dd}.");
-        _statusLabel.Text = "Konyvtaros nezet: hosszabbitas engedelyezve (mock).";
+        SetStatusBar("Konyvtaros nezet: hosszabbitas engedelyezve (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianExtendDenyClick(object? sender, EventArgs e)
     {
         if (GetSelectedLibrarianLoan() is null)
         {
-            MessageBox.Show("Valassz egy kolcsonzest az elutasitashoz.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Hosszabbitas", "Valassz egy kolcsonzest az elutasitashoz.");
             return;
         }
 
-        MessageBox.Show("A hosszabbitas elutasitva (mock). Backend bekotes kesobb.", "Hosszabbitas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        NotifyInfo("Hosszabbitas", "A hosszabbitas elutasitva (mock). Backend bekotes kesobb.");
         SetLibrarianLoanFeedback("Hosszabbitas elutasitva (mock).");
-        _statusLabel.Text = "Konyvtaros nezet: hosszabbitas elutasitva (mock).";
+        SetStatusBar("Konyvtaros nezet: hosszabbitas elutasitva (mock).");
     }
 
     private void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
@@ -799,14 +828,14 @@ public partial class Form1 : Form
         }
 
         SetLibrarianFineFeedback($"Birsag kiszabva (mock): {amount} Ft. Megjegyzes: {_librarianFineNoteInput.Text.Trim()}");
-        _statusLabel.Text = "Konyvtaros nezet: birsag rogzites (mock).";
+        SetStatusBar("Konyvtaros nezet: birsag rogzites (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianFineDeleteClick(object? sender, EventArgs e)
     {
-        MessageBox.Show("A birsag torlese a backendhez lesz kotve (mock).", "Birsag", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        NotifyInfo("Birsag", "A birsag torlese a backendhez lesz kotve (mock).");
         SetLibrarianFineFeedback("Birsag torles (mock) — nincs valtozas a listaban.");
-        _statusLabel.Text = "Konyvtaros nezet: birsag torles (mock).";
+        SetStatusBar("Konyvtaros nezet: birsag torles (mock).");
     }
 
     private TabPage BuildAdminTab()
@@ -1036,7 +1065,7 @@ public partial class Form1 : Form
         _adminIsNewBookMode = true;
         ClearAdminDetailForm();
         SetAdminDetailFeedback("Uj konyv mod: toltsd ki a kotelezo mezoket, majd Ment.");
-        _statusLabel.Text = "Admin nezet: uj konyv mod (mock).";
+        SetStatusBar("Admin nezet: uj konyv mod (mock).");
     }
 
     private void HandleAdminReloadSelectionClick(object? sender, EventArgs e)
@@ -1044,14 +1073,14 @@ public partial class Form1 : Form
         var selected = GetSelectedAdminBook();
         if (selected is null)
         {
-            MessageBox.Show("Valassz egy konyvet a tablazatbol.", "Modositas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Modositas", "Valassz egy konyvet a tablazatbol.");
             return;
         }
 
         _adminIsNewBookMode = false;
         LoadAdminDetailFromBook(selected);
         SetAdminDetailFeedback("Adatok ujratoltve a kivalasztott sorbol.");
-        _statusLabel.Text = "Admin nezet: szerkesztes (mock).";
+        SetStatusBar("Admin nezet: szerkesztes (mock).");
     }
 
     private void HandleAdminDeleteClick(object? sender, EventArgs e)
@@ -1059,11 +1088,11 @@ public partial class Form1 : Form
         var selected = GetSelectedAdminBook();
         if (selected is null)
         {
-            MessageBox.Show("Valassz egy konyvet a torleshez.", "Torles", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Torles", "Valassz egy konyvet a torleshez.");
             return;
         }
 
-        if (MessageBox.Show($"Biztosan torlod?\n\n{selected.Cim}", "Torles", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+        if (!ConfirmWarning("Torles", $"Biztosan torlod?\n\n{selected.Cim}"))
         {
             return;
         }
@@ -1073,7 +1102,7 @@ public partial class Form1 : Form
         ClearAdminDetailForm();
         RefreshAdminStockGrid();
         SetAdminDetailFeedback("Konyv torolve (mock).");
-        _statusLabel.Text = "Admin nezet: torles (mock).";
+        SetStatusBar("Admin nezet: torles (mock).", StatusTone.Warning);
     }
 
     private void HandleAdminRefreshClick(object? sender, EventArgs e)
@@ -1081,7 +1110,7 @@ public partial class Form1 : Form
         var id = GetSelectedAdminBook()?.Id;
         RefreshAdminStockGrid(id);
         SetAdminDetailFeedback("Lista frissitve (mock).");
-        _statusLabel.Text = "Admin nezet: frissites (mock).";
+        SetStatusBar("Admin nezet: frissites (mock).");
     }
 
     private void HandleAdminSetStateClick(string allapot)
@@ -1089,7 +1118,7 @@ public partial class Form1 : Form
         var selected = GetSelectedAdminBook();
         if (selected is null)
         {
-            MessageBox.Show("Valassz egy konyvet az allapot modositasahoz.", "Allapot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            NotifyInfo("Allapot", "Valassz egy konyvet az allapot modositasahoz.");
             return;
         }
 
@@ -1102,7 +1131,7 @@ public partial class Form1 : Form
         _adminBooksData[idx] = selected with { Allapot = allapot };
         RefreshAdminStockGrid(selected.Id);
         SetAdminDetailFeedback($"Allapot beallitva: {allapot} (mock).");
-        _statusLabel.Text = "Admin nezet: allapot (mock).";
+        SetStatusBar("Admin nezet: allapot (mock).", StatusTone.Success);
     }
 
     private void HandleAdminSaveClick(object? sender, EventArgs e)
@@ -1134,7 +1163,7 @@ public partial class Form1 : Form
             _adminIsNewBookMode = false;
             RefreshAdminStockGrid(book.Id);
             SetAdminDetailFeedback($"Uj konyv mentve (mock). ID: {id}.");
-            _statusLabel.Text = "Admin nezet: uj konyv (mock).";
+            SetStatusBar("Admin nezet: uj konyv (mock).", StatusTone.Success);
             return;
         }
 
@@ -1162,7 +1191,7 @@ public partial class Form1 : Form
             allapot);
         RefreshAdminStockGrid(selected.Id);
         SetAdminDetailFeedback("Valtozasok mentve (mock).");
-        _statusLabel.Text = "Admin nezet: mentes (mock).";
+        SetStatusBar("Admin nezet: mentes (mock).", StatusTone.Success);
     }
 
     private void HandleAdminResetClick(object? sender, EventArgs e)
@@ -1238,8 +1267,7 @@ public partial class Form1 : Form
         };
 
         button.FlatAppearance.BorderSize = 0;
-        button.Click += (_, _) =>
-            MessageBox.Show("Ez a funkcio meg nincs implementalva.", "GUI vaz", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        button.Click += (_, _) => NotifyInfo("GUI vaz", "Ez a funkcio meg nincs implementalva.");
 
         return button;
     }
