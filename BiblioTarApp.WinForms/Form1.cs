@@ -97,6 +97,7 @@ public partial class Form1 : Form
         RefreshUserHistoryGrid();
         RefreshLibrarianLoansGrid();
         RefreshAdminStockGrid();
+        ConfigureKeyboardAccessibility();
         ApplyRoleTabs("Felhasznalo");
     }
 
@@ -218,6 +219,121 @@ public partial class Form1 : Form
         Success,
         Warning,
         Error
+    }
+
+    private void ConfigureKeyboardAccessibility()
+    {
+        KeyPreview = true;
+        KeyDown += FormKeyDownHandler;
+
+        if (_roleSelector is not null)
+        {
+            _roleSelector.TabIndex = 0;
+            _roleSelector.AccessibleName = "Aktiv szerepkor valaszto";
+        }
+
+        if (_loginEmailInput is not null)
+        {
+            _loginEmailInput.TabIndex = 1;
+            _loginEmailInput.AccessibleName = "Bejelentkezes email";
+        }
+
+        if (_loginPasswordInput is not null)
+        {
+            _loginPasswordInput.TabIndex = 2;
+            _loginPasswordInput.AccessibleName = "Bejelentkezes jelszo";
+        }
+
+        if (_registerNameInput is not null)
+        {
+            _registerNameInput.TabIndex = 3;
+            _registerNameInput.AccessibleName = "Regisztracio nev";
+            _registerEmailInput.TabIndex = 4;
+            _registerPhoneInput.TabIndex = 5;
+            _registerPasswordInput.TabIndex = 6;
+            _registerPasswordAgainInput.TabIndex = 7;
+            _registerRoleInput.TabIndex = 8;
+        }
+
+        if (_userSearchInput is not null)
+        {
+            _userSearchInput.TabIndex = 9;
+            _userSearchInput.AccessibleName = "Felhasznalo konyvkereso";
+        }
+
+        if (_librarianUserIdInput is not null)
+        {
+            _librarianUserIdInput.TabIndex = 10;
+            _librarianBookIdInput.TabIndex = 11;
+            _librarianDeadlinePicker.TabIndex = 12;
+        }
+
+        if (_adminCimInput is not null)
+        {
+            _adminCimInput.TabIndex = 13;
+            _adminSzerzoInput.TabIndex = 14;
+            _adminIsbnInput.TabIndex = 15;
+            _adminKategoriaInput.TabIndex = 16;
+            _adminKiadasevInput.TabIndex = 17;
+            _adminKolcsonozhetoCheck.TabIndex = 18;
+            _adminAllapotCombo.TabIndex = 19;
+        }
+    }
+
+    private void FormKeyDownHandler(object? sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.F)
+        {
+            if (_mainTabs.SelectedTab == _userTab)
+            {
+                _userSearchInput.Focus();
+                _userSearchInput.SelectAll();
+                SetStatusBar("Fokusz a konyvkereso mezon.");
+            }
+
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.F5)
+        {
+            RefreshActiveView();
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.KeyCode == Keys.Escape)
+        {
+            SetStatusBar("Keszen all. Valassz muveletet.");
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    private void RefreshActiveView()
+    {
+        if (_mainTabs.SelectedTab == _userTab)
+        {
+            RefreshUserBooksGrid(_userSearchInput.Text);
+            RefreshUserHistoryGrid();
+            SetStatusBar("Felhasznalo nezet frissitve (F5).", StatusTone.Success);
+            return;
+        }
+
+        if (_mainTabs.SelectedTab == _librarianTab)
+        {
+            RefreshLibrarianLoansGrid();
+            SetStatusBar("Konyvtaros nezet frissitve (F5).", StatusTone.Success);
+            return;
+        }
+
+        if (_mainTabs.SelectedTab == _adminTab)
+        {
+            RefreshAdminStockGrid(GetSelectedAdminBook()?.Id);
+            SetStatusBar("Admin nezet frissitve (F5).", StatusTone.Success);
+            return;
+        }
+
+        SetStatusBar("Auth nezet aktiv. Nincs frissitendo lista.");
     }
 
     private void SetStatusBar(string message, StatusTone tone = StatusTone.Neutral)
