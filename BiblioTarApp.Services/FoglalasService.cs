@@ -42,6 +42,11 @@ namespace BiblioTarApp.Services
                 throw new Exception("A határidőnek későbbi időpontnak kell lennie, mint a foglalás ideje.");
             }
 
+            if (foglalasCreateDto.Hatarido > DateTime.Now.AddDays(30))
+            {
+                throw new Exception("A foglalás határideje legfeljebb 30 napra adható meg.");
+            }
+
             var aktivFoglalasVan = await _context.Foglalasok.AnyAsync(f =>
                 f.KonyvId == foglalasCreateDto.KonyvId &&
                 f.Statusz == FoglalasStatusz.Foglalt);

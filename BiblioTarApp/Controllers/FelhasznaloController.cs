@@ -1,11 +1,15 @@
 ﻿using BiblioTarApp.DTOs;
 using BiblioTarApp.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace BiblioTarApp.Controllers
 {
+    
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class FelhasznaloController : ControllerBase
     {
         private readonly IFelhasznaloService _felhasznaloService;
@@ -14,9 +18,10 @@ namespace BiblioTarApp.Controllers
         {
             _felhasznaloService = felhasznaloService;
         }
-
+        
         [HttpPost]
         [Route("create")]
+        [AllowAnonymous]
         public async Task<IActionResult> Create([FromBody] FelhasznaloCreateDto felhasznaloCreateDto)
         {
             try
@@ -29,9 +34,10 @@ namespace BiblioTarApp.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
+        
         [HttpPost]
         [Route("login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] FelhasznaloLoginDto felhasznaloLoginDto)
         {
             try
@@ -44,9 +50,10 @@ namespace BiblioTarApp.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
+        
         [HttpGet]
         [Route("getall")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _felhasznaloService.List();
@@ -58,9 +65,10 @@ namespace BiblioTarApp.Controllers
 
             return Ok(result);
         }
-
+        
         [HttpGet]
         [Route("{id}")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> GetById(int id)
         {
             try
@@ -73,11 +81,13 @@ namespace BiblioTarApp.Controllers
                 return NotFound(ex.Message);
             }
         }
-
+        
         [HttpPut]
         [Route("update")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> Update([FromBody] FelhasznaloUpdateDto felhasznaloUpdateDto)
         {
+            felhasznaloUpdateDto.Id = int.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value);
             try
             {
                 var result = await _felhasznaloService.Update(felhasznaloUpdateDto);
@@ -88,13 +98,14 @@ namespace BiblioTarApp.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
         [HttpDelete]
-        [Route("delete/{id}")]
-        public async Task<IActionResult> SoftDelete(int id)
+        [Route("delete")]
+        [Authorize(Policy = "AllUserPolicy")]
+        public async Task<IActionResult> SoftDelete()
         {
             try
             {
+                int id = int.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value);
                 var result = await _felhasznaloService.SoftDelete(id);
                 return Ok(result);
             }
@@ -103,9 +114,10 @@ namespace BiblioTarApp.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
+        
         [HttpPut]
         [Route("update-role")]
+        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> UpdateSzerepkor([FromBody] FelhasznaloSzerepkorUpdateDto felhasznaloSzerepkorUpdateDto)
         {
             try

@@ -6,7 +6,6 @@ namespace BiblioTarApp.DTOs
     {
         public int FelhasznaloId { get; set; }
         public int FoglalasId { get; set; }
-        public int Ar { get; set; }
     }
 
     public class BuntetesGetDto

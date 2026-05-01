@@ -26,6 +26,7 @@ namespace BiblioTarApp.DataContext.Entites
         public string? Statusz { get; set; }
         public DateTime? PublikalasIdeje { get; set; }
         public bool Ertelekes { get; set; }
+
     }
 }
 

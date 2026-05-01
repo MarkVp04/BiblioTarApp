@@ -3,30 +3,42 @@ using BiblioTarApp.DataContext.Context;
 using BiblioTarApp.DataContext.Entites;
 using BiblioTarApp.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace BiblioTarApp.Services
 {
     public interface IFelhasznaloService
     {
         Task<int> Create(FelhasznaloCreateDto felhasznaloCreateDto);
-        Task<FelhasznaloGetDto> Login(FelhasznaloLoginDto felhasznaloLoginDto);
+        
         Task<List<FelhasznaloGetDto>> List();
         Task<FelhasznaloGetDto> GetById(int id);
         Task<string> Update(FelhasznaloUpdateDto felhasznaloUpdateDto);
         Task<string> SoftDelete(int id);
         Task<string> UpdateSzerepkor(FelhasznaloSzerepkorUpdateDto felhasznaloSzerepkorUpdateDto);
+        Task<LoginResponseDto> Login(FelhasznaloLoginDto felhasznaloLoginDto);
+        Task<Felhasznalo> Authenticate(FelhasznaloLoginDto felhasznaloLoginDto);
+        string GenerateToken(Felhasznalo felhasznalo);
     }
 
     public class FelhasznaloService : IFelhasznaloService
     {
+
         private readonly AppDbContext _context;
         private readonly IMapper _mapper;
+        private readonly IConfiguration _configuration;
 
-        public FelhasznaloService(AppDbContext context, IMapper mapper)
+        public FelhasznaloService(AppDbContext context, IMapper mapper, IConfiguration configuration)
         {
             _context = context;
             _mapper = mapper;
+            _configuration = configuration;
         }
+
 
         public async Task<int> Create(FelhasznaloCreateDto felhasznaloCreateDto)
         {
@@ -54,6 +66,7 @@ namespace BiblioTarApp.Services
             }
 
             var felhasznalo = _mapper.Map<Felhasznalo>(felhasznaloCreateDto);
+            felhasznalo.Jelszo = BCrypt.Net.BCrypt.HashPassword(felhasznaloCreateDto.Jelszo);
             felhasznalo.Szerepkor = Felhasznalo.Beosztas.Regisztralt;
             felhasznalo.Aktiv = true;
 
@@ -63,7 +76,21 @@ namespace BiblioTarApp.Services
             return felhasznalo.Id;
         }
 
-        public async Task<FelhasznaloGetDto> Login(FelhasznaloLoginDto felhasznaloLoginDto)
+        public async Task<LoginResponseDto> Login(FelhasznaloLoginDto felhasznaloLoginDto)
+        {
+            var felhasznalo = await Authenticate(felhasznaloLoginDto);
+
+            return new LoginResponseDto
+            {
+                Token = GenerateToken(felhasznalo),
+                FelhasznaloId = felhasznalo.Id,
+                Nev = felhasznalo.Nev,
+                Email = felhasznalo.Email,
+                Szerepkor = felhasznalo.Szerepkor.ToString()
+            };
+        }
+
+        public async Task<Felhasznalo> Authenticate(FelhasznaloLoginDto felhasznaloLoginDto)
         {
             var felhasznalo = await _context.Felhasznalok
                 .Include(f => f.Lakcimek)
@@ -75,12 +102,44 @@ namespace BiblioTarApp.Services
                 throw new Exception("A felhasználó inaktív.");
             }
 
-            if (felhasznalo.Jelszo != felhasznaloLoginDto.Jelszo)
+            bool helyesJelszo = BCrypt.Net.BCrypt.Verify(felhasznaloLoginDto.Jelszo, felhasznalo.Jelszo);
+
+            if (!helyesJelszo)
             {
                 throw new Exception("Hibás jelszó.");
             }
 
-            return _mapper.Map<FelhasznaloGetDto>(felhasznalo);
+            return felhasznalo;
+        }
+
+        public string GenerateToken(Felhasznalo felhasznalo)
+        {
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_configuration["JwtSettings:SecretKey"]!));
+
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, felhasznalo.Id.ToString()),
+        new Claim(ClaimTypes.Name, felhasznalo.Nev),
+        new Claim(ClaimTypes.Email, felhasznalo.Email),
+        new Claim(ClaimTypes.Role, felhasznalo.Szerepkor.ToString()),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+
+            var expires = DateTime.Now.AddDays(
+                Convert.ToDouble(_configuration["JwtSettings:ExpiresInDays"]));
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JwtSettings:Issuer"],
+                audience: _configuration["JwtSettings:Audience"],
+                claims: claims,
+                expires: expires,
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         public async Task<List<FelhasznaloGetDto>> List()

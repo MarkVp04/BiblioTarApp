@@ -28,10 +28,7 @@ namespace BiblioTarApp.Services
 
         public async Task<int> Create(BuntetesCreateDto buntetesCreateDto)
         {
-            if (buntetesCreateDto.Ar <= 0)
-            {
-                throw new Exception("A büntetés összege csak pozitív szám lehet.");
-            }
+            const int napiKesesdij = 200;
 
             var felhasznalo = await _context.Felhasznalok
                 .FirstOrDefaultAsync(f => f.Id == buntetesCreateDto.FelhasznaloId)
@@ -54,21 +51,30 @@ namespace BiblioTarApp.Services
                 throw new Exception("Büntetés csak visszahozott könyvhöz rögzíthető.");
             }
 
-            if (foglalas.Hatarido >= DateTime.Now)
-            {
-                throw new Exception("A könyv nem késve lett visszahozva, ezért nem adható hozzá büntetés.");
-            }
-
             if (foglalas.Szamla != null)
             {
                 throw new Exception("Ehhez a foglaláshoz már tartozik büntetés.");
             }
 
+            if (foglalas.Kolcsonzes == null || foglalas.Kolcsonzes.VisszahozasIdeje == null)
+            {
+                throw new Exception("A visszahozás időpontja nem ismert.");
+            }
+
+            int kesettNapok = (foglalas.Kolcsonzes.VisszahozasIdeje.Value.Date - foglalas.Hatarido.Date).Days;
+
+            if (kesettNapok <= 0)
+            {
+                throw new Exception("A könyv nem késve lett visszahozva, ezért nem adható hozzá büntetés.");
+            }
+
+            int buntetesOsszeg = kesettNapok * napiKesesdij;
+
             var buntetes = new Buntetes
             {
                 FelhasznaloId = felhasznalo.Id,
                 FoglalasId = foglalas.Id,
-                Ar = buntetesCreateDto.Ar,
+                Ar = buntetesOsszeg,
                 FizetesiStatusz = false,
                 BuntetesIdeje = DateTime.Now
             };

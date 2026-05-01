@@ -144,6 +144,11 @@ namespace BiblioTarApp.Services
                 throw new Exception("Az új határidőnek későbbinek kell lennie a jelenlegi határidőnél.");
             }
 
+            if (kolcsonzesHosszabbitasDto.UjHatarido > kolcsonzes.Foglalas.Hatarido.AddDays(30))
+            {
+                throw new Exception("Egy hosszabbítás legfeljebb 30 nappal tolhatja ki a határidőt.");
+            }
+
             kolcsonzes.Foglalas.Hatarido = kolcsonzesHosszabbitasDto.UjHatarido;
             kolcsonzes.Foglalas.MeghosszabbitasiLehetosegek--;
 
@@ -166,16 +171,19 @@ namespace BiblioTarApp.Services
             switch (kolcsonzes.Statusz)
             {
                 case KolcsonzesStatusz.Aktiv:
+                    kolcsonzes.VisszahozasIdeje = null;
                     kolcsonzes.Konyv.Statusz = KonyvStatusz.NemElerheto.ToString();
                     kolcsonzes.Foglalas.Statusz = FoglalasStatusz.Foglalt;
                     break;
 
                 case KolcsonzesStatusz.Teljesitett:
+                    kolcsonzes.VisszahozasIdeje = DateTime.Now;
                     kolcsonzes.Konyv.Statusz = KonyvStatusz.Elerheto.ToString();
                     kolcsonzes.Foglalas.Statusz = FoglalasStatusz.Visszahozott;
                     break;
 
                 case KolcsonzesStatusz.Torolve:
+                    kolcsonzes.VisszahozasIdeje = null;
                     kolcsonzes.Konyv.Statusz = KonyvStatusz.Elerheto.ToString();
                     kolcsonzes.Foglalas.Statusz = FoglalasStatusz.Torolve;
                     break;

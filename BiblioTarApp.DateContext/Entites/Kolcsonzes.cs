@@ -25,6 +25,7 @@ namespace BiblioTarApp.DataContext.Entites
         public int FoglalasId { get; set; }
 
         public DateTime KolcsozesIdeje { get; set; }
+        public DateTime? VisszahozasIdeje { get; set; }
         public KolcsonzesStatusz Statusz { get; set; }
 
         public Felhasznalo? Felhasznalo { get; set; }

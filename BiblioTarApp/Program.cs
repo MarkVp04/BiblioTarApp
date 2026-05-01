@@ -2,28 +2,17 @@ using BiblioTarApp.DataContext.Context;
 using BiblioTarApp.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using AutoMapper;
-
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
-
-
-string connectionString = "Server=.\\SQLEXPRESS;Database=KonyvtarDB;User Id=sa;Password=csapat15;TrustServerCertificate=True;";
-
-//builder.Services.AddDbContext<AppDbContext>(options =>
-//   options.UseSqlServer(connectionString));
-
-//builder.Services.AddDbContext<AppDbContext>(options =>
-//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("BiblioTarContext")));
-
-
 
 builder.Services.AddScoped<IKonyvServices, KonyvService>();
 builder.Services.AddScoped<ILakcimService, LakcimService>();
@@ -32,19 +21,73 @@ builder.Services.AddScoped<IKolcsonzesService, KolcsonzesService>();
 builder.Services.AddScoped<IBuntetesService, BuntetesService>();
 builder.Services.AddScoped<IFelhasznaloService, FelhasznaloService>();
 builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddHttpContextAccessor();
 
+var jwt = builder.Configuration.GetSection("JwtSettings");
 
-//Swegger
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwt["Issuer"],
+            ValidAudience = jwt["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["SecretKey"]!))
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy",
+        policy => policy.RequireRole("Adminisztrator"));
+
+    options.AddPolicy("StaffPolicy",
+        policy => policy.RequireRole("Konyvtaros", "Adminisztrator"));
+
+    options.AddPolicy("AllUserPolicy",
+        policy => policy.RequireRole("Regisztralt", "Konyvtaros", "Adminisztrator"));
+});
+
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "BiblioTarApp API", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Ide írd be: Bearer {token}",
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -53,6 +96,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

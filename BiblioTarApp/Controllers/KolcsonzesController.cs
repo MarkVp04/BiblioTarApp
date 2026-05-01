@@ -1,5 +1,6 @@
 ﻿using BiblioTarApp.DTOs;
 using BiblioTarApp.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BiblioTarApp.Controllers
@@ -17,6 +18,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpPost]
         [Route("create")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> Create([FromBody] KolcsonzesCreateDto kolcsonzesCreateDto)
         {
             try
@@ -32,6 +34,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpGet]
         [Route("getall")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _kolcsonzesService.List();
@@ -46,6 +49,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpGet]
         [Route("{id}")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> GetById(int id)
         {
             try
@@ -61,6 +65,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpGet]
         [Route("user/{felhasznaloId}")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> GetByFelhasznaloId(int felhasznaloId)
         {
             try
@@ -82,6 +87,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpPut]
         [Route("extend")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> Hosszabbitas([FromBody] KolcsonzesHosszabbitasDto kolcsonzesHosszabbitasDto)
         {
             try
@@ -97,6 +103,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpPut]
         [Route("status")]
+        [Authorize(Policy = "StaffPolicy")]
         public async Task<IActionResult> UpdateStatus([FromBody] KolcsonzesStatuszUpdateDto kolcsonzesStatuszUpdateDto)
         {
             try

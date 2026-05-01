@@ -16,6 +16,7 @@ namespace BiblioTarApp.DTOs
         public string KonyvCim { get; set; } = string.Empty;
         public int FoglalasId { get; set; }
         public DateTime KolcsozesIdeje { get; set; }
+        public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }
         public KolcsonzesStatusz Statusz { get; set; }

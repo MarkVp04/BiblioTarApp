@@ -1,12 +1,15 @@
 ﻿using BiblioTarApp.DTOs;
 using BiblioTarApp.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace BiblioTarApp.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class LakcimController : ControllerBase
+    [Authorize]
+    public class LakcimController : ControllerBase 
     {
         private readonly ILakcimService _lakcimService;
 
@@ -17,10 +20,29 @@ namespace BiblioTarApp.Controllers
 
         [HttpPost]
         [Route("create")]
-        public async Task<IActionResult> Create([FromBody] LakcimCreateDto lakcimCreateDto)
+        [Authorize(Policy = "AllUserPolicy")]
+        public async Task<IActionResult> Create([FromBody] LakcimCreateDto request)
         {
-            var result = await _lakcimService.CreateAsyncLakcim(lakcimCreateDto);
-            return Ok(result);
+            try
+            {
+                int userId = int.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value);
+
+                var lakcimCreateDto = new LakcimCreateDto
+                {
+                    Iranyitoszam = request.Iranyitoszam,
+                    Varos = request.Varos,
+                    Utca = request.Utca,
+                    Hazszam = request.Hazszam,
+                    FelhasznaloId = userId
+                };
+
+                var result = await _lakcimService.CreateAsyncLakcim(lakcimCreateDto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
     }
 }
