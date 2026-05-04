@@ -40,22 +40,30 @@ public static class ApiClient
 
         return null;
     }
+    // ApiClient.cs
     public static async Task<List<KonyvDto>?> GetKonyvekAsync()
     {
         try
         {
-
-            var response = await Client.GetAsync("api/Konyv");
+            // Hozzáadtuk a /getall végződést, mert a Controllerben ez van megadva!
+            var response = await Client.GetAsync("api/Konyv/getall");
 
             if (response.IsSuccessStatusCode)
             {
                 return await response.Content.ReadFromJsonAsync<List<KonyvDto>>();
             }
+
+            // Itt érdemes megnézni, mi a hiba (401? 403? 404?)
+            var errorLog = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"API Hiba: {response.StatusCode} - {errorLog}");
+
+            return null;
         }
-        catch
+        catch (Exception ex)
         {
+            MessageBox.Show($"Hálózati hiba: {ex.Message}");
+            return null;
         }
-        return null;
     }
     public static async Task<bool> RegisterAsync(string nev, string email, string jelszo)
     {

@@ -1,3 +1,5 @@
+using System.Windows.Forms;
+
 namespace BiblioTarApp.WinForms;
 
 public partial class Form1 : Form
@@ -91,7 +93,8 @@ public partial class Form1 : Form
         root.Controls.Add(_statusLabel, 0, 2);
 
         ApplyTheme(root);
-        SeedUserMockData();
+        //SeedUserMockData();
+        LoadUserBooksFromApiAsync();
         SeedLibrarianMockData();
         RefreshUserBooksGrid(string.Empty);
         RefreshUserHistoryGrid();
@@ -99,6 +102,8 @@ public partial class Form1 : Form
         RefreshAdminStockGrid();
         ConfigureKeyboardAccessibility();
         ApplyRoleTabs("Felhasznalo");
+
+
     }
 
     private static TableLayoutPanel CreateRootLayout()
@@ -309,13 +314,13 @@ public partial class Form1 : Form
         }
     }
 
-    private void RefreshActiveView()
+    private async void RefreshActiveView()
     {
         if (_mainTabs.SelectedTab == _userTab)
         {
-            RefreshUserBooksGrid(_userSearchInput.Text);
+            await LoadUserBooksFromApiAsync();
             RefreshUserHistoryGrid();
-            SetStatusBar("Felhasznalo nezet frissitve (F5).", StatusTone.Success);
+            SetStatusBar("Felhasznalo nezet frissitve az API-rol (F5).", StatusTone.Success);
             return;
         }
 
@@ -452,6 +457,7 @@ public partial class Form1 : Form
                 _roleSelector.SelectedItem = "Konyvtaros";
             else
                 _roleSelector.SelectedItem = "Felhasznalo";
+            await LoadUserBooksFromApiAsync();
         }
         else
         {
@@ -504,7 +510,7 @@ public partial class Form1 : Form
             _registerNameInput.Text = "";
             _registerEmailInput.Text = "";
             _registerPasswordInput.Text = "";
-            _registerConfirmPasswordInput.Text = "";
+            _registerPasswordAgainInput.Text = "";
         }
         else
         {
@@ -597,7 +603,7 @@ public partial class Form1 : Form
     private void HandleUserSearchClick(object? sender, EventArgs e)
     {
         RefreshUserBooksGrid(_userSearchInput.Text);
-        SetStatusBar("Felhasznalo nezet: kereses lefutott (mock).", StatusTone.Success);
+        SetStatusBar("Felhasznalo nezet: kereses lefutott.", StatusTone.Success);
     }
 
     private void HandleUserClearSearchClick(object? sender, EventArgs e)
@@ -645,7 +651,7 @@ public partial class Form1 : Form
         _userHistoryData.Add(ujTortenet);
         RefreshUserHistoryGrid();
 
-        NotifyInfo("Siker", $"{selected.Cim} sikeresen eljegyezve/kolcsonozve!");
+        NotifyInfo("Siker", $"{selected.Cim} sikeresen elojegyezve!");
     }
 
     private void RefreshUserBooksGrid(string? query)
@@ -673,28 +679,14 @@ public partial class Form1 : Form
             : $"Kolcsonzesi tetelszam: {_userHistoryData.Count}";
     }
 
-    private void SeedUserMockData()
+    public async Task LoadUserBooksFromApiAsync()
     {
-        if (_userBooksData.Count > 0 || _userHistoryData.Count > 0)
+        var konyvek = await ApiClient.GetKonyvekAsync();
+
+        if (konyvek != null)
         {
-            return;
+            _userBooksGrid.DataSource = konyvek;
         }
-
-        _userBooksData.AddRange(new[]
-        {
-            new UserBookMockItem("A Pal utcai fiuk", "Molnar Ferenc", "Ifjusagi", 1907, true),
-            new UserBookMockItem("Egri csillagok", "Gardonyi Geza", "Tortenelmi", 1899, false),
-            new UserBookMockItem("Az ember tragediaja", "Madach Imre", "Drama", 1862, true),
-            new UserBookMockItem("Szent Peter esernyoje", "Mikszath Kalman", "Regeny", 1895, true),
-            new UserBookMockItem("Tuskevar", "Fekete Istvan", "Ifjusagi", 1957, false)
-        });
-
-        _userHistoryData.AddRange(new[]
-        {
-            new UserHistoryMockItem("A Pal utcai fiuk", "2026-04-01", "2026-04-15", "Lezart", 1),
-            new UserHistoryMockItem("Egri csillagok", "2026-04-08", "2026-04-22", "Aktiv", 0),
-            new UserHistoryMockItem("Tuskevar", "2026-03-01", "2026-03-15", "Lezart", 2)
-        });
     }
 
     private void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
@@ -1263,16 +1255,13 @@ public partial class Form1 : Form
     {
         SetStatusBar("Konyvek lekerdezese folyamatban...", StatusTone.Neutral);
 
-        // Lekérdezzük az igazi adatokat az API-ból
         var konyvek = await ApiClient.GetKonyvekAsync();
 
         if (konyvek != null)
         {
-            // Kiürítjük a régi listát és beletesszük az újat
             _adminBooksData.Clear();
             _adminBooksData.AddRange(konyvek);
 
-            // UI frissítése
             var id = GetSelectedAdminBook()?.Id;
             RefreshAdminStockGrid(id);
 
@@ -1301,7 +1290,6 @@ public partial class Form1 : Form
             return;
         }
 
-        //_adminBooksData[idx] = selected with { Allapot = allapot };
         RefreshAdminStockGrid(selected.Id);
         SetAdminDetailFeedback($"Allapot beallitva: {allapot} (mock).");
         SetStatusBar("Admin nezet: allapot (mock).", StatusTone.Success);
