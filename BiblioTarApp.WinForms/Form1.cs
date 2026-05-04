@@ -57,8 +57,9 @@ public partial class Form1 : Form
     private Label _adminStockInfoLabel = null!;
     private bool _adminSuppressSelectionChanged;
     private bool _adminIsNewBookMode;
-    private readonly List<AdminBookMockItem> _adminBooksData = new();
     private int _nextAdminBookId = 1;
+    private TextBox _registerConfirmPasswordInput = null!;
+    private readonly List<KonyvDto> _adminBooksData = new();
 
     public Form1()
     {
@@ -92,7 +93,6 @@ public partial class Form1 : Form
         ApplyTheme(root);
         SeedUserMockData();
         SeedLibrarianMockData();
-        SeedAdminMockData();
         RefreshUserBooksGrid(string.Empty);
         RefreshUserHistoryGrid();
         RefreshLibrarianLoansGrid();
@@ -416,7 +416,7 @@ public partial class Form1 : Form
         return tab;
     }
 
-    private void HandleLoginClick(object? sender, EventArgs e)
+    private async void HandleLoginClick(object? sender, EventArgs e)
     {
         var email = _loginEmailInput.Text.Trim();
         var password = _loginPasswordInput.Text.Trim();
@@ -433,50 +433,85 @@ public partial class Form1 : Form
             return;
         }
 
-        _loginValidationLabel.Text = "Validacio rendben. Login funkcio kesobb lesz bekotve.";
-        SetStatusBar("Auth UI: Bejelentkezes validacio kesz.", StatusTone.Success);
+
+        _loginValidationLabel.Text = "Bejelentkezes folyamatban...";
+        _loginValidationLabel.ForeColor = MutedTextColor;
+        SetStatusBar("Auth UI: Bejelentkezes folyamatban...", StatusTone.Neutral);
+
+        var loginResult = await ApiClient.LoginAsync(email, password);
+
+        if (loginResult != null)
+        {
+            _loginValidationLabel.Text = $"Sikeres bejelentkezes! Udv, {loginResult.Nev}!";
+            _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
+            SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
+
+            if (loginResult.Szerepkor == "Adminisztrator")
+                _roleSelector.SelectedItem = "Adminisztrator";
+            else if (loginResult.Szerepkor == "Konyvtaros")
+                _roleSelector.SelectedItem = "Konyvtaros";
+            else
+                _roleSelector.SelectedItem = "Felhasznalo";
+        }
+        else
+        {
+            _loginValidationLabel.Text = "Hibas e-mail cim vagy jelszo, esetleg nem fut az API!";
+            _loginValidationLabel.ForeColor = Color.FromArgb(185, 28, 28);
+            SetStatusBar("Auth UI: API bejelentkezes sikertelen.", StatusTone.Error);
+        }
     }
 
-    private void HandleRegisterClick(object? sender, EventArgs e)
+    private async void HandleRegisterClick(object? sender, EventArgs e)
     {
         var name = _registerNameInput.Text.Trim();
         var email = _registerEmailInput.Text.Trim();
-        var phone = _registerPhoneInput.Text.Trim();
-        var password = _registerPasswordInput.Text.Trim();
-        var passwordAgain = _registerPasswordAgainInput.Text.Trim();
-        var role = _registerRoleInput.SelectedItem?.ToString();
+        var password = _registerPasswordInput.Text;
+        var confirmPassword = _registerPasswordAgainInput.Text;
 
-        if (string.IsNullOrWhiteSpace(name) ||
-            string.IsNullOrWhiteSpace(email) ||
-            string.IsNullOrWhiteSpace(phone) ||
-            string.IsNullOrWhiteSpace(password) ||
-            string.IsNullOrWhiteSpace(passwordAgain) ||
-            string.IsNullOrWhiteSpace(role))
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            _registerValidationLabel.Text = "Toltsd ki az osszes kotelezo mezot.";
+            _registerValidationLabel.Text = "Minden mezot ki kell tolteni!";
+            _registerValidationLabel.ForeColor = Color.Red;
+            return;
+        }
+
+        if (password != confirmPassword)
+        {
+            _registerValidationLabel.Text = "A ket jelszo nem egyezik!";
+            _registerValidationLabel.ForeColor = Color.Red;
             return;
         }
 
         if (!LooksLikeEmail(email))
         {
-            _registerValidationLabel.Text = "Az email formatuma nem megfelelo.";
+            _registerValidationLabel.Text = "Ervenytelen email formatum!";
+            _registerValidationLabel.ForeColor = Color.Red;
             return;
         }
 
-        if (password.Length < 6)
+        SetStatusBar("Regisztracio folyamatban...", StatusTone.Neutral);
+        _registerValidationLabel.Text = "Kuldes...";
+        _registerValidationLabel.ForeColor = MutedTextColor;
+
+        bool success = await ApiClient.RegisterAsync(name, email, password);
+
+        if (success)
         {
-            _registerValidationLabel.Text = "A jelszo legalabb 6 karakter legyen.";
-            return;
-        }
+            _registerValidationLabel.Text = "Sikeres regisztracio! Most mar bejelentkezhetsz.";
+            _registerValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
+            SetStatusBar("Regisztracio sikeres.", StatusTone.Success);
 
-        if (!string.Equals(password, passwordAgain, StringComparison.Ordinal))
+            _registerNameInput.Text = "";
+            _registerEmailInput.Text = "";
+            _registerPasswordInput.Text = "";
+            _registerConfirmPasswordInput.Text = "";
+        }
+        else
         {
-            _registerValidationLabel.Text = "A ket jelszo nem egyezik.";
-            return;
+            _registerValidationLabel.Text = "Hiba a regisztracio soran (lehet foglalt az email).";
+            _registerValidationLabel.ForeColor = Color.Red;
+            SetStatusBar("Regisztracios hiba az API-n.", StatusTone.Error);
         }
-
-        _registerValidationLabel.Text = "Validacio rendben. Regisztracio funkcio kesobb lesz bekotve.";
-        SetStatusBar("Auth UI: Regisztracio validacio kesz.", StatusTone.Success);
     }
 
     private TabPage BuildUserTab()
@@ -525,8 +560,12 @@ public partial class Form1 : Form
         AddRow(profileForm, "Email", new TextBox());
         AddRow(profileForm, "Telefon", new TextBox());
         AddRow(profileForm, "Lakcim", new TextBox());
-        AddRow(profileForm, "", CreateActionButton("Adatok mentese"));
+        AddRow(profileForm, "", CreatePrimaryButton("Adatok mentese", (s, ev) => {
+            NotifyInfo("Profil", "A profiladatok mentese megtortent (mock).");
+            SetStatusBar("Felhasznalo adatai frissitve.", StatusTone.Success);
+        }));
         profileGroup.Controls.Add(profileForm);
+
 
         var historyGroup = new GroupBox { Text = "Kolcsonzesi elozmenyek", Dock = DockStyle.Fill };
         var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8) };
@@ -588,10 +627,25 @@ public partial class Form1 : Form
             return;
         }
 
-        var info = selected.Elerheto
-            ? "A konyv elerheto, az elojegyzes funkcio backendre var."
-            : "A konyv jelenleg nem elerheto, az elojegyzes funkcio backendre var.";
-        NotifyInfo("Elojegyzes (mock)", info);
+
+        if (!selected.Elerheto)
+        {
+            NotifyWarning("Hiba", "Ez a konyv jelenleg nem elerheto.");
+            return;
+        }
+
+        var ujTortenet = new UserHistoryMockItem(
+            selected.Cim,
+            DateTime.Now.ToString("yyyy-MM-dd"),
+            DateTime.Now.AddDays(14).ToString("yyyy-MM-dd"),
+            "Aktiv",
+            0
+        );
+
+        _userHistoryData.Add(ujTortenet);
+        RefreshUserHistoryGrid();
+
+        NotifyInfo("Siker", $"{selected.Cim} sikeresen eljegyezve/kolcsonozve!");
     }
 
     private void RefreshUserBooksGrid(string? query)
@@ -1060,22 +1114,6 @@ public partial class Form1 : Form
         return tab;
     }
 
-    private void SeedAdminMockData()
-    {
-        if (_adminBooksData.Count > 0)
-        {
-            return;
-        }
-
-        _adminBooksData.AddRange(new[]
-        {
-            new AdminBookMockItem(1, "Egri csillagok", "Gardonyi Geza", "978963", "Tortenelmi", 1899, true, "Jo"),
-            new AdminBookMockItem(2, "Tuskevar", "Fekete Istvan", null, "Ifjusagi", 1957, true, "Jo"),
-            new AdminBookMockItem(3, "A Pal utcai fiuk", "Molnar Ferenc", "9789632", "Ifjusagi", 1907, false, "Serult")
-        });
-        _nextAdminBookId = 4;
-    }
-
     private void RefreshAdminStockGrid(int? selectIdAfter = null)
     {
         _adminSuppressSelectionChanged = true;
@@ -1103,14 +1141,14 @@ public partial class Form1 : Form
             _adminSuppressSelectionChanged = false;
         }
 
-        if (selectIdAfter is int selId)
-        {
-            var book = _adminBooksData.FirstOrDefault(b => b.Id == selId);
-            if (book is not null)
-            {
-                LoadAdminDetailFromBook(book);
-            }
-        }
+        //if (selectIdAfter is int selId)
+        //{
+        //    var book = _adminBooksData.FirstOrDefault(b => b.Id == selId);
+        //    if (book is not null)
+        //    {
+        //        LoadAdminDetailFromBook(book);
+        //    }
+        //}
     }
 
     private void AdminStockGrid_SelectionChanged(object? sender, EventArgs e)
@@ -1221,12 +1259,31 @@ public partial class Form1 : Form
         SetStatusBar("Admin nezet: torles (mock).", StatusTone.Warning);
     }
 
-    private void HandleAdminRefreshClick(object? sender, EventArgs e)
+    private async void HandleAdminRefreshClick(object? sender, EventArgs e)
     {
-        var id = GetSelectedAdminBook()?.Id;
-        RefreshAdminStockGrid(id);
-        SetAdminDetailFeedback("Lista frissitve (mock).");
-        SetStatusBar("Admin nezet: frissites (mock).");
+        SetStatusBar("Konyvek lekerdezese folyamatban...", StatusTone.Neutral);
+
+        // Lekérdezzük az igazi adatokat az API-ból
+        var konyvek = await ApiClient.GetKonyvekAsync();
+
+        if (konyvek != null)
+        {
+            // Kiürítjük a régi listát és beletesszük az újat
+            _adminBooksData.Clear();
+            _adminBooksData.AddRange(konyvek);
+
+            // UI frissítése
+            var id = GetSelectedAdminBook()?.Id;
+            RefreshAdminStockGrid(id);
+
+            SetAdminDetailFeedback("Lista frissitve az adatbazisbol.");
+            SetStatusBar("Admin nezet: sikeres adatbazis frissites.", StatusTone.Success);
+        }
+        else
+        {
+            SetAdminDetailFeedback("Hiba a konyvek lekerdezese soran!", true);
+            SetStatusBar("Admin nezet: API hiba.", StatusTone.Error);
+        }
     }
 
     private void HandleAdminSetStateClick(string allapot)
@@ -1244,7 +1301,7 @@ public partial class Form1 : Form
             return;
         }
 
-        _adminBooksData[idx] = selected with { Allapot = allapot };
+        //_adminBooksData[idx] = selected with { Allapot = allapot };
         RefreshAdminStockGrid(selected.Id);
         SetAdminDetailFeedback($"Allapot beallitva: {allapot} (mock).");
         SetStatusBar("Admin nezet: allapot (mock).", StatusTone.Success);
@@ -1271,17 +1328,6 @@ public partial class Form1 : Form
         var allapot = _adminAllapotCombo.SelectedItem?.ToString() ?? "Jo";
         var kolcsonozheto = _adminKolcsonozhetoCheck.Checked;
 
-        if (_adminIsNewBookMode)
-        {
-            var id = _nextAdminBookId++;
-            var book = new AdminBookMockItem(id, cim, szerzo, isbn, kategoria, kiadasev, kolcsonozheto, allapot);
-            _adminBooksData.Add(book);
-            _adminIsNewBookMode = false;
-            RefreshAdminStockGrid(book.Id);
-            SetAdminDetailFeedback($"Uj konyv mentve (mock). ID: {id}.");
-            SetStatusBar("Admin nezet: uj konyv (mock).", StatusTone.Success);
-            return;
-        }
 
         var selected = GetSelectedAdminBook();
         if (selected is null)
@@ -1295,19 +1341,6 @@ public partial class Form1 : Form
         {
             return;
         }
-
-        _adminBooksData[index] = new AdminBookMockItem(
-            selected.Id,
-            cim,
-            szerzo,
-            isbn,
-            kategoria,
-            kiadasev,
-            kolcsonozheto,
-            allapot);
-        RefreshAdminStockGrid(selected.Id);
-        SetAdminDetailFeedback("Valtozasok mentve (mock).");
-        SetStatusBar("Admin nezet: mentes (mock).", StatusTone.Success);
     }
 
     private void HandleAdminResetClick(object? sender, EventArgs e)
@@ -1436,8 +1469,10 @@ public partial class Form1 : Form
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoGenerateColumns = true
         };
+
         grid.BackgroundColor = SurfaceBackground;
         grid.BorderStyle = BorderStyle.None;
         grid.EnableHeadersVisualStyles = false;
@@ -1448,12 +1483,6 @@ public partial class Form1 : Form
         grid.DefaultCellStyle.SelectionForeColor = Color.Black;
         grid.RowHeadersVisible = false;
 
-        foreach (var column in columns)
-        {
-            grid.Columns.Add(column, column);
-        }
-
-        grid.Rows.Add(columns.Select(_ => "-").ToArray());
         return grid;
     }
 

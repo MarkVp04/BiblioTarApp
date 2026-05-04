@@ -8,4 +8,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\BiblioTarApp.DateContext\BiblioTarApp.DataContext.csproj" />
+    <ProjectReference Include="..\BiblioTarApp.Services\BiblioTarApp.Services.csproj" />
+    <ProjectReference Include="..\BiblioTarApp\BiblioTarApp.csproj" />
+  </ItemGroup>
+
 </Project>

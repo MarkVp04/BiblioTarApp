@@ -28,11 +28,19 @@ partial class Form1
     /// </summary>
     private void InitializeComponent()
     {
+        SuspendLayout();
+        // 
+        // Form1
+        // 
+        AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new Size(1280, 760);
         MinimumSize = new Size(1100, 700);
+        Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
         Text = "BiblioTarApp - GUI vaz";
+        //Load += Form1_Load;
+        ResumeLayout(false);
     }
 
     #endregion
