@@ -19,7 +19,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpPost]
         [Route("create")]
-        [Authorize(Policy = "AdminPolicy")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> Create([FromBody] KonyvCreateDto konyvCreateDto)
         {
             try
@@ -79,7 +79,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpPut]
         [Route("update")]
-        [Authorize(Policy = "AdminPolicy")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> Update([FromBody] KonyvUpdateDto konyvUpdateDto)
         {
             try

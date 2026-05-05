@@ -1,3 +1,4 @@
+using BiblioTarApp.DTOs;
 using System.Windows.Forms;
 
 namespace BiblioTarApp.WinForms;
@@ -339,6 +340,33 @@ public partial class Form1 : Form
         }
 
         SetStatusBar("Auth nezet aktiv. Nincs frissitendo lista.");
+    }
+    private void RefreshAdminStockGrid(int? selectIdAfter = null)
+    {
+        _adminSuppressSelectionChanged = true;
+        try
+        {
+            _adminStockGrid.DataSource = null;
+            _adminStockGrid.DataSource = _adminBooksData.OrderBy(b => b.Id).ToList();
+            _adminStockInfoLabel.Text = $"Könyvek: {_adminBooksData.Count}";
+
+            if (selectIdAfter is int id)
+            {
+                foreach (DataGridViewRow row in _adminStockGrid.Rows)
+                {
+                    if (row.DataBoundItem is KonyvDto book && book.Id == id) // Ez így már jó lesz, ha a névtér tiszta
+                        {
+                        row.Selected = true;
+                        _adminStockGrid.CurrentCell = row.Cells.Count > 0 ? row.Cells[0] : null;
+                        break;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _adminSuppressSelectionChanged = false;
+        }
     }
 
     private void SetStatusBar(string message, StatusTone tone = StatusTone.Neutral)
@@ -1106,51 +1134,11 @@ public partial class Form1 : Form
         return tab;
     }
 
-    private void RefreshAdminStockGrid(int? selectIdAfter = null)
-    {
-        _adminSuppressSelectionChanged = true;
-        try
-        {
-            _adminStockGrid.DataSource = null;
-            _adminStockGrid.DataSource = _adminBooksData.OrderBy(b => b.Id).ToList();
-            _adminStockInfoLabel.Text = $"Konyvek: {_adminBooksData.Count}";
-
-            if (selectIdAfter is int id)
-            {
-                foreach (DataGridViewRow row in _adminStockGrid.Rows)
-                {
-                    if (row.DataBoundItem is AdminBookMockItem book && book.Id == id)
-                    {
-                        row.Selected = true;
-                        _adminStockGrid.CurrentCell = row.Cells.Count > 0 ? row.Cells[0] : null;
-                        break;
-                    }
-                }
-            }
-        }
-        finally
-        {
-            _adminSuppressSelectionChanged = false;
-        }
-
-        //if (selectIdAfter is int selId)
-        //{
-        //    var book = _adminBooksData.FirstOrDefault(b => b.Id == selId);
-        //    if (book is not null)
-        //    {
-        //        LoadAdminDetailFromBook(book);
-        //    }
-        //}
-    }
-
     private void AdminStockGrid_SelectionChanged(object? sender, EventArgs e)
     {
-        if (_adminSuppressSelectionChanged)
-        {
-            return;
-        }
+        if (_adminSuppressSelectionChanged) return;
 
-        if (_adminStockGrid.CurrentRow?.DataBoundItem is AdminBookMockItem book)
+        if (_adminStockGrid.CurrentRow?.DataBoundItem is KonyvDto book)
         {
             _adminIsNewBookMode = false;
             LoadAdminDetailFromBook(book);
@@ -1158,7 +1146,7 @@ public partial class Form1 : Form
         }
     }
 
-    private void LoadAdminDetailFromBook(AdminBookMockItem book)
+    private void LoadAdminDetailFromBook(KonyvDto book)
     {
         _adminCimInput.Text = book.Cim;
         _adminSzerzoInput.Text = book.Szerzo;
@@ -1167,6 +1155,14 @@ public partial class Form1 : Form
         _adminKiadasevInput.Text = book.Kiadasev.ToString();
         _adminKolcsonozhetoCheck.Checked = book.Kolcsonozheto;
         _adminAllapotCombo.SelectedItem = book.Allapot;
+    }
+    private KonyvDto? GetSelectedAdminBook()
+    {
+        if (_adminStockGrid.CurrentRow?.DataBoundItem is KonyvDto book)
+        {
+            return book;
+        }
+        return null;
     }
 
     private void ClearAdminDetailForm()
@@ -1184,16 +1180,6 @@ public partial class Form1 : Form
     {
         _adminDetailFeedbackLabel.Text = text;
         _adminDetailFeedbackLabel.ForeColor = isError ? Color.FromArgb(185, 28, 28) : MutedTextColor;
-    }
-
-    private AdminBookMockItem? GetSelectedAdminBook()
-    {
-        if (_adminStockGrid.CurrentRow?.DataBoundItem is AdminBookMockItem book)
-        {
-            return book;
-        }
-
-        return null;
     }
 
     private void HandleAdminNewBookClick(object? sender, EventArgs e)
@@ -1229,26 +1215,37 @@ public partial class Form1 : Form
         SetStatusBar("Admin nezet: szerkesztes (mock).");
     }
 
-    private void HandleAdminDeleteClick(object? sender, EventArgs e)
+    private async void HandleAdminDeleteClick(object? sender, EventArgs e)
     {
         var selected = GetSelectedAdminBook();
         if (selected is null)
         {
-            NotifyInfo("Torles", "Valassz egy konyvet a torleshez.");
+            NotifyInfo("Törlés", "Válassz egy könyvet a törléshez.");
             return;
         }
 
-        if (!ConfirmWarning("Torles", $"Biztosan torlod?\n\n{selected.Cim}"))
+        if (!ConfirmWarning("Törlés", $"Biztosan törlöd a rendszerből?\n\n{selected.Cim}"))
         {
             return;
         }
 
-        _adminBooksData.RemoveAll(b => b.Id == selected.Id);
-        _adminIsNewBookMode = false;
-        ClearAdminDetailForm();
-        RefreshAdminStockGrid();
-        SetAdminDetailFeedback("Konyv torolve (mock).");
-        SetStatusBar("Admin nezet: torles (mock).", StatusTone.Warning);
+        SetStatusBar("Könyv törlése folyamatban...", StatusTone.Neutral);
+
+        bool success = await ApiClient.DeleteKonyvAsync(selected.Id);
+
+        if (success)
+        {
+            _adminIsNewBookMode = false;
+            ClearAdminDetailForm();
+            HandleAdminRefreshClick(null, null);
+            SetAdminDetailFeedback("Könyv sikeresen törölve a backendből.");
+            SetStatusBar("Admin nézet: sikeres törlés.", StatusTone.Success);
+        }
+        else
+        {
+            SetAdminDetailFeedback("Hiba történt a törlés során!", true);
+            SetStatusBar("Admin nézet: API törlési hiba.", StatusTone.Error);
+        }
     }
 
     private async void HandleAdminRefreshClick(object? sender, EventArgs e)
@@ -1284,50 +1281,102 @@ public partial class Form1 : Form
             return;
         }
 
-        var idx = _adminBooksData.FindIndex(b => b.Id == selected.Id);
-        if (idx < 0)
+        var index = _adminBooksData.FindIndex(b => b.Id == selected.Id);
+        if (index >= 0)
         {
-            return;
+            _adminBooksData[index] = selected with { Allapot = allapot };
+            RefreshAdminStockGrid(selected.Id);
+            SetAdminDetailFeedback($"Allapot beallitva: {allapot} (helyi frissites).");
+            SetStatusBar("Admin nezet: allapot modositva.", StatusTone.Success);
         }
-
-        RefreshAdminStockGrid(selected.Id);
-        SetAdminDetailFeedback($"Allapot beallitva: {allapot} (mock).");
-        SetStatusBar("Admin nezet: allapot (mock).", StatusTone.Success);
     }
 
-    private void HandleAdminSaveClick(object? sender, EventArgs e)
+    private async void HandleAdminSaveClick(object? sender, EventArgs e)
     {
         var cim = _adminCimInput.Text.Trim();
         var szerzo = _adminSzerzoInput.Text.Trim();
+
         if (string.IsNullOrWhiteSpace(cim) || string.IsNullOrWhiteSpace(szerzo))
         {
-            SetAdminDetailFeedback("A cim es a szerzo megadasa kotelezo.", true);
+            SetAdminDetailFeedback("A cím és a szerző megadása kötelező.", true);
             return;
         }
 
         if (!int.TryParse(_adminKiadasevInput.Text.Trim(), out var kiadasev))
         {
-            SetAdminDetailFeedback("A kiadas eve egesz szam legyen.", true);
+            SetAdminDetailFeedback("A kiadás éve egész szám legyen.", true);
             return;
         }
 
-        var kategoria = string.IsNullOrWhiteSpace(_adminKategoriaInput.Text) ? "Egyeb" : _adminKategoriaInput.Text.Trim();
+        var kategoria = string.IsNullOrWhiteSpace(_adminKategoriaInput.Text) ? "Egyéb" : _adminKategoriaInput.Text.Trim();
         var isbn = string.IsNullOrWhiteSpace(_adminIsbnInput.Text) ? null : _adminIsbnInput.Text.Trim();
         var allapot = _adminAllapotCombo.SelectedItem?.ToString() ?? "Jo";
         var kolcsonozheto = _adminKolcsonozhetoCheck.Checked;
 
+        SetStatusBar("Mentés folyamatban...", StatusTone.Neutral);
 
-        var selected = GetSelectedAdminBook();
-        if (selected is null)
+        try
         {
-            SetAdminDetailFeedback("Valassz sort a modositashoz, vagy hasznald az Uj konyv gombot.", true);
-            return;
+            bool success;
+            if (_adminIsNewBookMode)
+            {
+                var createDto = new KonyvCreateDto
+                {
+                    Cim = cim,
+                    Szerzo = szerzo,
+                    Isbn = isbn,
+                    Kategoria = kategoria,
+                    Kiadasev = kiadasev,
+                    Kolcsonozheto = kolcsonozheto,
+                    Allapot = allapot
+                };
+                success = await ApiClient.CreateKonyvAsync(createDto);
+            }
+            else
+            {
+                var selected = GetSelectedAdminBook();
+                if (selected is null)
+                {
+                    // JAVÍTÁS: Kilépés helyett jelezzük a hibát a felhasználónak!
+                    SetAdminDetailFeedback("Nincs kiválasztva könyv! Új könyv felvételéhez előbb kattints az 'Új könyv' gombra.", true);
+                    SetStatusBar("Mentés megszakítva.", StatusTone.Warning);
+                    return;
+                }
+
+                var updateDto = new KonyvUpdateDto
+                {
+                    Id = selected.Id,
+                    Cim = cim,
+                    Szerzo = szerzo,
+                    Isbn = isbn,
+                    Kategoria = kategoria,
+                    Kiadasev = kiadasev,
+                    Allapot = allapot,
+                    Kolcsonozheto = kolcsonozheto,
+                    Statusz = selected.Statusz,
+                    PublikalasIdeje = DateTime.Now,
+                    Ertelekes = true
+                };
+                success = await ApiClient.UpdateKonyvAsync(selected.Id, updateDto);
+            }
+
+            if (success)
+            {
+                SetAdminDetailFeedback(_adminIsNewBookMode ? "Új könyv sikeresen mentve." : "Könyv módosítva.");
+                ClearAdminDetailForm();
+                _adminIsNewBookMode = false;
+                HandleAdminRefreshClick(null, null);
+            }
+            else
+            {
+                SetAdminDetailFeedback("A szerver hibát jelzett vissza (ellenőrizze a jogosultságokat és a bejelentkezést).", true);
+                SetStatusBar("Admin nézet: API mentési hiba.", StatusTone.Error);
+            }
         }
-
-        var index = _adminBooksData.FindIndex(b => b.Id == selected.Id);
-        if (index < 0)
+        catch (Exception ex)
         {
-            return;
+            SetAdminDetailFeedback($"Hálózati hiba: {ex.Message}", true);
+            SetStatusBar("Hiba a mentés során!", StatusTone.Error);
         }
     }
 
