@@ -1,5 +1,6 @@
 using BiblioTarApp.DTOs;
 using System.Windows.Forms;
+using System.Text.Json.Serialization;
 
 namespace BiblioTarApp.WinForms;
 
@@ -36,8 +37,7 @@ public partial class Form1 : Form
     private DataGridView _userHistoryGrid = null!;
     private Label _userBooksInfoLabel = null!;
     private Label _userHistoryInfoLabel = null!;
-    private readonly List<UserBookMockItem> _userBooksData = new();
-    private readonly List<UserHistoryMockItem> _userHistoryData = new();
+    private List<ApiClient.KolcsonzesHistoryDto> _userHistoryData = new();
     private TextBox _librarianUserIdInput = null!;
     private TextBox _librarianBookIdInput = null!;
     private DateTimePicker _librarianDeadlinePicker = null!;
@@ -468,27 +468,24 @@ public partial class Form1 : Form
         if (loginResult != null)
         {
             _currentUserId = loginResult.FelhasznaloId;
-            _loginValidationLabel.Text = $"Sikeres bejelentkezes! Udv, {loginResult.Nev}!";
+            _loginValidationLabel.Text = $"Sikeres bejelentkezés! Üdv, {loginResult.Nev}!";
             _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
-            SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
+            SetStatusBar($"Sikeres bejelentkezés. Szerepkör: {loginResult.Szerepkor}", StatusTone.Success);
 
-            _roleSelector.SelectedItem = loginResult.Szerepkor;
+            string uiRoleName = loginResult.Szerepkor == "Regisztralt" ? "Felhasznalo" : loginResult.Szerepkor;
+            _roleSelector.SelectedItem = uiRoleName;
 
             _roleSelector.Enabled = (loginResult.Szerepkor == "Adminisztrator");
 
             ApplyRoleTabs(loginResult.Szerepkor);
 
             await LoadUserBooksFromApiAsync();
+            await LoadUserHistoryFromApiAsync();
 
             if (loginResult.Szerepkor == "Konyvtaros" || loginResult.Szerepkor == "Adminisztrator")
             {
                 await RefreshFoglalasokGrid();
                 await RefreshLibrarianLoansGrid();
-            }
-
-            if (loginResult.Szerepkor == "Adminisztrator")
-            {
-                RefreshAdminStockGrid();
             }
         }
     }
@@ -680,10 +677,27 @@ public partial class Form1 : Form
 
     private void RefreshUserHistoryGrid()
     {
-        _userHistoryGrid.DataSource = _userHistoryData.ToList();
+        _userHistoryGrid.DataSource = null;
+
+        _userHistoryGrid.DataSource = _userHistoryData.Select(x => new
+        {
+            Könyv = x.KonyvCim,
+            Szerző = x.Szerzo,
+            Kölcsönzés = x.KolcsonzesIdeje.ToString("yyyy.MM.dd"),
+            Határidő = x.Hatarido.ToString("yyyy.MM.dd"),
+            Státusz = x.Statusz switch
+            {
+                0 => "Aktív",
+                1 => "Lezárt",
+                2 => "Késedelmes",
+                _ => "Ismeretlen"
+            },
+            Hosszabbítások = x.HosszabbitasokSzama
+        }).ToList();
+
         _userHistoryInfoLabel.Text = _userHistoryData.Count == 0
-            ? "Nincs meg kolcsonzesi elozmeny."
-            : $"Kolcsonzesi tetelszam: {_userHistoryData.Count}";
+            ? "Nincs kölcsönzési előzmény."
+            : $"Kölcsönzések száma: {_userHistoryData.Count}";
     }
 
     public async Task LoadUserBooksFromApiAsync()
@@ -695,36 +709,41 @@ public partial class Form1 : Form
             RefreshUserBooksGrid(string.Empty);
         }
     }
-
-    private void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
+    public async Task LoadUserHistoryFromApiAsync()
     {
-        RefreshUserHistoryGrid();
-        SetStatusBar("Felhasznalo nezet: kolcsonzesi lista frissitve (mock).", StatusTone.Success);
+        var history = await ApiClient.GetMyHistoryAsync();
+
+        if (history != null)
+        {
+            _userHistoryData = history;
+            RefreshUserHistoryGrid();
+        }
+        else
+        {
+            _userHistoryData.Clear();
+            RefreshUserHistoryGrid();
+        }
+    }
+
+    private async void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
+    {
+        await LoadUserHistoryFromApiAsync();
+        SetStatusBar("Kölcsönzési előzmények frissítve.", StatusTone.Success);
     }
 
     private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
+{
+    if (_userHistoryGrid.CurrentRow == null)
     {
-        if (_userHistoryGrid.CurrentRow?.DataBoundItem is not UserHistoryMockItem selected)
-        {
-            NotifyInfo("Hosszabbitas", "Valassz kolcsonzest a hosszabbitashoz.");
-            return;
-        }
-
-        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
-        {
-            NotifyWarning("Hosszabbitas", "Csak aktiv kolcsonzes hosszabbithato.");
-            return;
-        }
-
-        if (selected.Hosszabbitasok >= 2)
-        {
-            NotifyWarning("Hosszabbitas", "A kolcsonzes mar elerte a max 2 hosszabbitast.");
-            return;
-        }
-
-        NotifyInfo("Hosszabbitas", "A hosszabbitas kerese rogzitve (mock). Backend bekotes kesobb.");
-        SetStatusBar("Felhasznalo nezet: hosszabbitas kerese elokeszitve (mock).", StatusTone.Success);
+        NotifyInfo("Hosszabbítás", "Válassz kölcsönzést.");
+        return;
     }
+
+    NotifyInfo(
+        "Hosszabbítás",
+        "A hosszabbítás backend bekötése még nincs implementálva ehhez a listához."
+    );
+}
 
     private TabPage BuildLibrarianTab()
     {
