@@ -8,6 +8,7 @@ namespace BiblioTarApp.DTOs
         public string Email { get; set; } = string.Empty;
         public string Jelszo { get; set; } = string.Empty;
         public string? Telefonszam { get; set; }
+        public Felhasznalo.Beosztas Szerepkor { get; set; }
     }
 
     public class FelhasznaloLoginDto

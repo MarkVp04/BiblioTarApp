@@ -64,14 +64,19 @@ public static class ApiClient
             return null;
         }
     }
-    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo)
+    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo, int szerepkor)
     {
-        var registerData = new { Nev = nev, Email = email, Jelszo = jelszo };
+        var registerData = new
+        {
+            Nev = nev,
+            Email = email,
+            Jelszo = jelszo,
+            Szerepkor = szerepkor
+        };
 
         try
         {
             var response = await Client.PostAsJsonAsync("api/Felhasznalo/create", registerData);
-
             return response.IsSuccessStatusCode;
         }
         catch
@@ -90,7 +95,6 @@ public static class ApiClient
                 return true;
             }
 
-            // Ha hiba van, olvassuk ki a szerver pontos üzenetét!
             var errorMsg = await response.Content.ReadAsStringAsync();
             MessageBox.Show($"Sikertelen létrehozás!\nStátuszkód: {response.StatusCode}\nÜzenet: {errorMsg}",
                             "API Hiba", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -103,16 +107,12 @@ public static class ApiClient
         }
     }
 
-    // Adjunk hozzá egy 'int id' paramétert
     public static async Task<bool> UpdateKonyvAsync(int id, KonyvUpdateDto modositottKonyv)
     {
         try
         {
-            // Fontos: a modositottKonyv-nak tartalmaznia kell az ID-t is, 
-            // mert a backend KonyvUpdateDto-ja alapjan onnan olvassa ki a szerviz!
             modositottKonyv.Id = id;
 
-            // A backend [Route("update")]-et var a Controllerben (feltetelezve a korabbi struktura alapjan)
             var response = await Client.PutAsJsonAsync("api/Konyv/update", modositottKonyv);
 
             if (response.IsSuccessStatusCode) return true;
@@ -148,6 +148,128 @@ public static class ApiClient
             MessageBox.Show($"Hálózati hiba: {ex.Message}", "Kritikus hiba", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return false;
         }
+    }
+
+    public static async Task<bool> CreateFoglalasAsync(int felhasznaloId, int konyvId, DateTime hatarido)
+    {
+        var foglalasAdat = new
+        {
+            FelhasznaloId = felhasznaloId,
+            KonyvId = konyvId,
+            Hatarido = hatarido
+        };
+
+        try
+        {
+            var response = await Client.PostAsJsonAsync("api/Foglalas/create", foglalasAdat);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static async Task<List<KolcsonzesGetDto>?> GetAllKolcsonzesAsync()
+    {
+        try
+        {
+            var response = await Client.GetAsync("api/Kolcsonzes/getall");
+            if (response.IsSuccessStatusCode)
+                return await response.Content.ReadFromJsonAsync<List<KolcsonzesGetDto>>();
+            return null;
+        }
+        catch (Exception ex) { MessageBox.Show($"Hiba: {ex.Message}"); return null; }
+    }
+
+    public static async Task<bool> CreateKolcsonzesAsync(int foglalasId)
+    {
+        try
+        {
+            var response = await Client.PostAsJsonAsync("api/Kolcsonzes/create", new { FoglalasId = foglalasId });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public static async Task<bool> UpdateKolcsonzesStatuszAsync(int kolcsonzesId, int statusz)
+    {
+        try
+        {
+            var response = await Client.PutAsJsonAsync("api/Kolcsonzes/status", new { Id = kolcsonzesId, Statusz = statusz });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public static async Task<bool> ExtendKolcsonzesAsync(int kolcsonzesId, DateTime ujHatarido)
+    {
+        try
+        {
+            var response = await Client.PutAsJsonAsync("api/Kolcsonzes/extend", new { Id = kolcsonzesId, UjHatarido = ujHatarido });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public static async Task<bool> CreateBuntetesAsync(int felhasznaloId, int foglalasId)
+    {
+        try
+        {
+            var response = await Client.PostAsJsonAsync("api/Buntetes/create", new { FelhasznaloId = felhasznaloId, FoglalasId = foglalasId });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public class KolcsonzesGetDto
+    {
+        public int Id { get; set; }
+        public int? FelhasznaloId { get; set; }
+        public string? Email { get; set; }
+        public int KonyvId { get; set; }
+        public string KonyvCim { get; set; } = string.Empty;
+        public int FoglalasId { get; set; }
+        public DateTime KolcsozesIdeje { get; set; }
+        public DateTime? VisszahozasIdeje { get; set; }
+        public DateTime Hatarido { get; set; }
+        public int MeghosszabbitasiLehetosegek { get; set; }
+        public int Statusz { get; set; }
+    }
+
+    public static async Task<List<FoglalasGetDto>?> GetAllFoglalasAsync()
+    {
+        try
+        {
+            var response = await Client.GetAsync("api/Foglalas/getall");
+
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<List<FoglalasGetDto>>();
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"API Hiba!\nStátusz: {response.StatusCode}\nÜzenet: {errorContent}",
+                            "Hiba", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Kapcsolódási hiba: {ex.Message}", "Kritikus Hiba",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return null;
+        }
+    }
+
+    public class FoglalasGetDto
+    {
+        public int Id { get; set; }
+        public int FelhasznaloId { get; set; }
+        public int KonyvId { get; set; }
+        public string KonyvCim { get; set; } = string.Empty;
+        public DateTime FoglalasIdeje { get; set; }
+        public DateTime Hatarido { get; set; }
+        public int Statusz { get; set; }
     }
 
     public class LoginResponse

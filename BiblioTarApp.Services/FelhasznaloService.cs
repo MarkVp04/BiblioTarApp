@@ -14,7 +14,6 @@ namespace BiblioTarApp.Services
     public interface IFelhasznaloService
     {
         Task<int> Create(FelhasznaloCreateDto felhasznaloCreateDto);
-        
         Task<List<FelhasznaloGetDto>> List();
         Task<FelhasznaloGetDto> GetById(int id);
         Task<string> Update(FelhasznaloUpdateDto felhasznaloUpdateDto);
@@ -27,7 +26,6 @@ namespace BiblioTarApp.Services
 
     public class FelhasznaloService : IFelhasznaloService
     {
-
         private readonly AppDbContext _context;
         private readonly IMapper _mapper;
         private readonly IConfiguration _configuration;
@@ -39,35 +37,39 @@ namespace BiblioTarApp.Services
             _configuration = configuration;
         }
 
-
         public async Task<int> Create(FelhasznaloCreateDto felhasznaloCreateDto)
         {
             if (string.IsNullOrWhiteSpace(felhasznaloCreateDto.Nev))
-            {
                 throw new Exception("A név megadása kötelező.");
-            }
 
             if (string.IsNullOrWhiteSpace(felhasznaloCreateDto.Email))
-            {
                 throw new Exception("Az email megadása kötelező.");
-            }
 
             if (string.IsNullOrWhiteSpace(felhasznaloCreateDto.Jelszo))
-            {
                 throw new Exception("A jelszó megadása kötelező.");
-            }
 
             var emailLetezik = await _context.Felhasznalok
                 .AnyAsync(f => f.Email == felhasznaloCreateDto.Email);
 
             if (emailLetezik)
-            {
                 throw new Exception("Ezzel az email címmel már létezik felhasználó.");
-            }
 
             var felhasznalo = _mapper.Map<Felhasznalo>(felhasznaloCreateDto);
+
+            // Jelszó hashelése
             felhasznalo.Jelszo = BCrypt.Net.BCrypt.HashPassword(felhasznaloCreateDto.Jelszo);
-            felhasznalo.Szerepkor = Felhasznalo.Beosztas.Regisztralt;
+
+            // JAVÍTÁS: Nem írjuk felül fixen 1-esre. 
+            // Ha a DTO-ban jött szerepkör (nem 0), azt használjuk, különben alapértelmezett a Regisztralt.
+            if (felhasznaloCreateDto.Szerepkor != 0)
+            {
+                felhasznalo.Szerepkor = felhasznaloCreateDto.Szerepkor;
+            }
+            else
+            {
+                felhasznalo.Szerepkor = Felhasznalo.Beosztas.Regisztralt;
+            }
+
             felhasznalo.Aktiv = true;
 
             await _context.Felhasznalok.AddAsync(felhasznalo);
@@ -86,7 +88,7 @@ namespace BiblioTarApp.Services
                 FelhasznaloId = felhasznalo.Id,
                 Nev = felhasznalo.Nev,
                 Email = felhasznalo.Email,
-                Szerepkor = felhasznalo.Szerepkor.ToString()
+                Szerepkor = felhasznalo.Szerepkor.ToString() // Itt szövegként megy vissza: "Konyvtaros"
             };
         }
 
@@ -98,16 +100,12 @@ namespace BiblioTarApp.Services
                 ?? throw new Exception("A felhasználó nem található.");
 
             if (!felhasznalo.Aktiv)
-            {
                 throw new Exception("A felhasználó inaktív.");
-            }
 
             bool helyesJelszo = BCrypt.Net.BCrypt.Verify(felhasznaloLoginDto.Jelszo, felhasznalo.Jelszo);
 
             if (!helyesJelszo)
-            {
                 throw new Exception("Hibás jelszó.");
-            }
 
             return felhasznalo;
         }
@@ -120,13 +118,14 @@ namespace BiblioTarApp.Services
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, felhasznalo.Id.ToString()),
-        new Claim(ClaimTypes.Name, felhasznalo.Nev),
-        new Claim(ClaimTypes.Email, felhasznalo.Email),
-        new Claim(ClaimTypes.Role, felhasznalo.Szerepkor.ToString()),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-    };
+            {
+                new Claim(ClaimTypes.NameIdentifier, felhasznalo.Id.ToString()),
+                new Claim(ClaimTypes.Name, felhasznalo.Nev),
+                new Claim(ClaimTypes.Email, felhasznalo.Email),
+                // Fontos: A Role claim-be a szöveges megnevezés kerül (pl. "Konyvtaros")
+                new Claim(ClaimTypes.Role, felhasznalo.Szerepkor.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
 
             var expires = DateTime.Now.AddDays(
                 Convert.ToDouble(_configuration["JwtSettings:ExpiresInDays"]));
@@ -170,9 +169,7 @@ namespace BiblioTarApp.Services
                 ?? throw new Exception("A felhasználó nem található.");
 
             if (!felhasznalo.Aktiv)
-            {
                 throw new Exception("Inaktív felhasználó nem módosítható.");
-            }
 
             if (!string.IsNullOrWhiteSpace(felhasznaloUpdateDto.Email) &&
                 felhasznaloUpdateDto.Email != felhasznalo.Email)
@@ -181,22 +178,16 @@ namespace BiblioTarApp.Services
                     .AnyAsync(f => f.Email == felhasznaloUpdateDto.Email && f.Id != felhasznaloUpdateDto.Id);
 
                 if (emailFoglalt)
-                {
                     throw new Exception("Ez az email cím már foglalt.");
-                }
 
                 felhasznalo.Email = felhasznaloUpdateDto.Email;
             }
 
             if (!string.IsNullOrWhiteSpace(felhasznaloUpdateDto.Nev))
-            {
                 felhasznalo.Nev = felhasznaloUpdateDto.Nev;
-            }
 
             if (!string.IsNullOrWhiteSpace(felhasznaloUpdateDto.Telefonszam))
-            {
                 felhasznalo.Telefonszam = felhasznaloUpdateDto.Telefonszam;
-            }
 
             _context.Felhasznalok.Update(felhasznalo);
             await _context.SaveChangesAsync();
@@ -211,9 +202,7 @@ namespace BiblioTarApp.Services
                 ?? throw new Exception("A felhasználó nem található.");
 
             if (!felhasznalo.Aktiv)
-            {
                 throw new Exception("A felhasználó már inaktív.");
-            }
 
             felhasznalo.Aktiv = false;
 

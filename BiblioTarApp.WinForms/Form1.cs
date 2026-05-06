@@ -14,6 +14,7 @@ public partial class Form1 : Form
     private static readonly Font HeaderFont = new("Segoe UI", 13F, FontStyle.Bold);
 
     private Label _statusLabel = null!;
+    private DataGridView _librarianFoglalasokGrid = null!;
     private ComboBox _roleSelector = null!;
     private TabControl _mainTabs = null!;
     private TabPage _authTab = null!;
@@ -46,8 +47,6 @@ public partial class Form1 : Form
     private TextBox _librarianFineNoteInput = null!;
     private Label _librarianFineFeedbackLabel = null!;
     private DataGridView _librarianLoansGrid = null!;
-    private readonly List<LibrarianLoanMockItem> _librarianLoansData = new();
-    private int _nextLibrarianLoanId = 1;
     private DataGridView _adminStockGrid = null!;
     private TextBox _adminCimInput = null!;
     private TextBox _adminSzerzoInput = null!;
@@ -63,7 +62,8 @@ public partial class Form1 : Form
     private int _nextAdminBookId = 1;
     private TextBox _registerConfirmPasswordInput = null!;
     private readonly List<KonyvDto> _adminBooksData = new();
-
+    private List<KonyvDto> _allBooksFromApi = new();
+    private int _currentUserId;
     public Form1()
     {
         InitializeComponent();
@@ -96,10 +96,8 @@ public partial class Form1 : Form
         ApplyTheme(root);
         //SeedUserMockData();
         LoadUserBooksFromApiAsync();
-        SeedLibrarianMockData();
         RefreshUserBooksGrid(string.Empty);
         RefreshUserHistoryGrid();
-        RefreshLibrarianLoansGrid();
         RefreshAdminStockGrid();
         ConfigureKeyboardAccessibility();
         ApplyRoleTabs("Felhasznalo");
@@ -326,7 +324,9 @@ public partial class Form1 : Form
 
         if (_mainTabs.SelectedTab == _librarianTab)
         {
-            RefreshLibrarianLoansGrid();
+            await RefreshLibrarianLoansGrid();
+            await RefreshFoglalasokGrid();
+
             SetStatusBar("Konyvtaros nezet frissitve (F5).", StatusTone.Success);
             return;
         }
@@ -474,6 +474,7 @@ public partial class Form1 : Form
 
         if (loginResult != null)
         {
+            _currentUserId = loginResult.FelhasznaloId;
             _loginValidationLabel.Text = $"Sikeres bejelentkezes! Udv, {loginResult.Nev}!";
             _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
             SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
@@ -501,48 +502,32 @@ public partial class Form1 : Form
         var password = _registerPasswordInput.Text;
         var confirmPassword = _registerPasswordAgainInput.Text;
 
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        int szerepkorValue = _registerRoleInput.SelectedItem?.ToString() switch
         {
-            _registerValidationLabel.Text = "Minden mezot ki kell tolteni!";
-            _registerValidationLabel.ForeColor = Color.Red;
-            return;
-        }
+            "Konyvtaros" => 2,
+            "Adminisztrator" => 4,
+            _ => 1
+        };
+
 
         if (password != confirmPassword)
         {
             _registerValidationLabel.Text = "A ket jelszo nem egyezik!";
-            _registerValidationLabel.ForeColor = Color.Red;
-            return;
-        }
-
-        if (!LooksLikeEmail(email))
-        {
-            _registerValidationLabel.Text = "Ervenytelen email formatum!";
-            _registerValidationLabel.ForeColor = Color.Red;
             return;
         }
 
         SetStatusBar("Regisztracio folyamatban...", StatusTone.Neutral);
-        _registerValidationLabel.Text = "Kuldes...";
-        _registerValidationLabel.ForeColor = MutedTextColor;
 
-        bool success = await ApiClient.RegisterAsync(name, email, password);
+        bool success = await ApiClient.RegisterAsync(name, email, password, szerepkorValue);
 
         if (success)
         {
-            _registerValidationLabel.Text = "Sikeres regisztracio! Most mar bejelentkezhetsz.";
-            _registerValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
+            _registerValidationLabel.Text = "Sikeres regisztracio!";
             SetStatusBar("Regisztracio sikeres.", StatusTone.Success);
-
-            _registerNameInput.Text = "";
-            _registerEmailInput.Text = "";
-            _registerPasswordInput.Text = "";
-            _registerPasswordAgainInput.Text = "";
         }
         else
         {
-            _registerValidationLabel.Text = "Hiba a regisztracio soran (lehet foglalt az email).";
-            _registerValidationLabel.ForeColor = Color.Red;
+            _registerValidationLabel.Text = "Hiba a regisztracio soran.";
             SetStatusBar("Regisztracios hiba az API-n.", StatusTone.Error);
         }
     }
@@ -642,60 +627,57 @@ public partial class Form1 : Form
 
     private void HandleUserDetailsClick(object? sender, EventArgs e)
     {
-        if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
+        if (_userBooksGrid.CurrentRow?.DataBoundItem is not KonyvDto selected)
         {
-            NotifyInfo("Reszletek", "Valassz egy konyvet a reszletekhez.");
+            NotifyInfo("Reszletek", "Valassz egy konyvet a listabol!");
             return;
         }
 
-        var details = $"Cim: {selected.Cim}\nSzerzo: {selected.Szerzo}\nKategoria: {selected.Kategoria}\nKiadas eve: {selected.Kiadasev}\nElerheto: {(selected.Elerheto ? "Igen" : "Nem")}";
-        NotifyInfo("Konyv reszletek (mock)", details);
+        var details = $"Cim: {selected.Cim}\nSzerzo: {selected.Szerzo}\nKategoria: {selected.Kategoria}\nAllapot: {selected.Allapot}";
+        NotifyInfo("Konyv reszletek", details);
     }
 
-    private void HandleUserReserveClick(object? sender, EventArgs e)
+    private async void HandleUserReserveClick(object? sender, EventArgs e)
     {
-        if (_userBooksGrid.CurrentRow?.DataBoundItem is not UserBookMockItem selected)
+        if (_userBooksGrid.CurrentRow?.DataBoundItem is not KonyvDto selected)
         {
-            NotifyInfo("Elojegyzes", "Valassz egy konyvet az elojegyzeshez.");
+            NotifyInfo("Elojegyzes", "Valassz egy konyvet!");
             return;
         }
 
-
-        if (!selected.Elerheto)
+        if (!selected.Kolcsonozheto) 
         {
-            NotifyWarning("Hiba", "Ez a konyv jelenleg nem elerheto.");
+            NotifyWarning("Hiba", "Ez a konyv jelenleg nem kolcsonozheto.");
             return;
         }
 
-        var ujTortenet = new UserHistoryMockItem(
-            selected.Cim,
-            DateTime.Now.ToString("yyyy-MM-dd"),
-            DateTime.Now.AddDays(14).ToString("yyyy-MM-dd"),
-            "Aktiv",
-            0
-        );
+        bool siker = await ApiClient.CreateFoglalasAsync(_currentUserId, selected.Id, DateTime.Now.AddDays(14));
 
-        _userHistoryData.Add(ujTortenet);
-        RefreshUserHistoryGrid();
-
-        NotifyInfo("Siker", $"{selected.Cim} sikeresen elojegyezve!");
+        if (siker)
+        {
+            NotifyInfo("Siker", $"A(z) {selected.Cim} sikeresen elojegyezve!");
+            await LoadUserBooksFromApiAsync(); 
+        }
+        else
+        {
+            NotifyWarning("Hiba", "A foglalás nem sikerült (talán már foglalt).");
+        }
     }
 
     private void RefreshUserBooksGrid(string? query)
     {
         var search = query?.Trim() ?? string.Empty;
         var filtered = string.IsNullOrWhiteSpace(search)
-            ? _userBooksData.ToList()
-            : _userBooksData.Where(x =>
+            ? _allBooksFromApi
+            : _allBooksFromApi.Where(x =>
                 x.Cim.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 x.Szerzo.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 x.Kategoria.Contains(search, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        _userBooksGrid.DataSource = null;
         _userBooksGrid.DataSource = filtered;
-        _userBooksInfoLabel.Text = filtered.Count == 0
-            ? "Nincs talalat a megadott keresesi feltetelre."
-            : $"Talalatok: {filtered.Count} / {_userBooksData.Count}";
+        _userBooksInfoLabel.Text = $"Talalatok: {filtered.Count}";
     }
 
     private void RefreshUserHistoryGrid()
@@ -709,10 +691,10 @@ public partial class Form1 : Form
     public async Task LoadUserBooksFromApiAsync()
     {
         var konyvek = await ApiClient.GetKonyvekAsync();
-
         if (konyvek != null)
         {
-            _userBooksGrid.DataSource = konyvek;
+            _allBooksFromApi = konyvek;
+            RefreshUserBooksGrid(string.Empty);
         }
     }
 
@@ -757,12 +739,14 @@ public partial class Form1 : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 5,
             Padding = new Padding(12)
         };
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize)); 
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize)); 
         loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var loanForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         loanForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
@@ -772,7 +756,7 @@ public partial class Form1 : Form
         _librarianBookIdInput = new TextBox();
         _librarianDeadlinePicker = new DateTimePicker { Format = DateTimePickerFormat.Short, MinDate = DateTime.Today };
         AddRow(loanForm, "Felhasznalo ID *", _librarianUserIdInput);
-        AddRow(loanForm, "Konyv ID *", _librarianBookIdInput);
+        AddRow(loanForm, "Foglalas ID *", _librarianBookIdInput);
         AddRow(loanForm, "Hatarido *", _librarianDeadlinePicker);
 
         var loanButtons = new FlowLayoutPanel
@@ -786,6 +770,14 @@ public partial class Form1 : Form
         loanButtons.Controls.Add(CreatePrimaryButton("Visszavetel", HandleLibrarianReturnClick));
         loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas engedelyezese", HandleLibrarianExtendApproveClick));
         loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas elutasitasa", HandleLibrarianExtendDenyClick));
+
+        _librarianFoglalasokGrid = CreateMockDataGrid();
+        _librarianFoglalasokGrid.MinimumSize = new Size(100, 150);
+        _librarianFoglalasokGrid.Height = 200;
+        _librarianFoglalasokGrid.SelectionChanged += HandleFoglalasSelectionChanged;
+
+        loanOuter.Controls.Add(new Label { Text = "Aktuális foglalások (Válassz ki egyet):", AutoSize = true, Font = new Font(BaseFont, FontStyle.Bold) }, 0, 3);
+        loanOuter.Controls.Add(_librarianFoglalasokGrid, 0, 4);
 
         _librarianLoanFeedbackLabel = new Label
         {
@@ -852,26 +844,48 @@ public partial class Form1 : Form
         return tab;
     }
 
-    private void SeedLibrarianMockData()
+    private void HandleFoglalasSelectionChanged(object? sender, EventArgs e)
     {
-        if (_librarianLoansData.Count > 0)
+        if (_librarianFoglalasokGrid.CurrentRow?.DataBoundItem is ApiClient.FoglalasGetDto selected)
+        {
+            _librarianUserIdInput.Text = selected.FelhasznaloId.ToString();
+            _librarianBookIdInput.Text = selected.Id.ToString();
+            _librarianDeadlinePicker.Value = selected.Hatarido;
+
+            SetLibrarianLoanFeedback($"Kiválasztva: {selected.KonyvCim}");
+        }
+    }
+
+    private async Task RefreshLibrarianLoansGrid()
+    {
+        SetStatusBar("Kölcsönzések betöltése...", StatusTone.Neutral);
+        var kolcsonzesek = await ApiClient.GetAllKolcsonzesAsync();
+        _librarianLoansGrid.DataSource = null;
+        if (kolcsonzesek != null)
+        {
+            _librarianLoansGrid.DataSource = kolcsonzesek;
+            SetStatusBar("Kölcsönzések frissítve.", StatusTone.Success);
+        }
+    }
+    private async Task RefreshFoglalasokGrid()
+    {
+        if (string.IsNullOrEmpty(ApiClient.Token))
         {
             return;
         }
 
-        _librarianLoansData.AddRange(new[]
+        var foglalasok = await ApiClient.GetAllFoglalasAsync();
+        _librarianFoglalasokGrid.DataSource = null;
+
+        if (foglalasok != null)
         {
-            new LibrarianLoanMockItem(1, 101, 12, "Egri csillagok", DateTime.Today.AddDays(5), "Aktiv", 0, 0),
-            new LibrarianLoanMockItem(2, 102, 15, "Tuskevar", DateTime.Today.AddDays(-2), "Aktiv", 2, 1),
-            new LibrarianLoanMockItem(3, 103, 8, "A Pal utcai fiuk", DateTime.Today.AddDays(-10), "Lezart", 5, 2)
-        });
-        _nextLibrarianLoanId = 4;
+            _librarianFoglalasokGrid.DataSource = foglalasok.ToList();
+        }
     }
 
-    private void RefreshLibrarianLoansGrid()
+    private ApiClient.KolcsonzesGetDto? GetSelectedLibrarianLoanActual()
     {
-        _librarianLoansGrid.DataSource = null;
-        _librarianLoansGrid.DataSource = _librarianLoansData.ToList();
+        return _librarianLoansGrid.CurrentRow?.DataBoundItem as ApiClient.KolcsonzesGetDto;
     }
 
     private void SetLibrarianLoanFeedback(string text, bool isError = false)
@@ -886,145 +900,82 @@ public partial class Form1 : Form
         _librarianFineFeedbackLabel.ForeColor = isError ? Color.FromArgb(185, 28, 28) : MutedTextColor;
     }
 
-    private LibrarianLoanMockItem? GetSelectedLibrarianLoan()
+    private async void HandleLibrarianLoanCreateClick(object? sender, EventArgs e)
     {
-        if (_librarianLoansGrid.CurrentRow?.DataBoundItem is LibrarianLoanMockItem item)
+        if (!int.TryParse(_librarianBookIdInput.Text.Trim(), out var foglalasId))
         {
-            return item;
+            SetLibrarianLoanFeedback("Érvénytelen Foglalás ID (szám kell)!", true);
+            return;
         }
 
-        return null;
+        SetLibrarianLoanFeedback("Kölcsönzés rögzítése folyamatban...");
+        bool siker = await ApiClient.CreateKolcsonzesAsync(foglalasId);
+
+        if (siker)
+        {
+            SetLibrarianLoanFeedback("Sikeres kölcsönzés!");
+            await RefreshLibrarianLoansGrid();
+        }
+        else
+        {
+            SetLibrarianLoanFeedback("Hiba! Csak aktív foglalásból lehet kölcsönözni.", true);
+        }
     }
 
-    private void HandleLibrarianLoanCreateClick(object? sender, EventArgs e)
+    private async void HandleLibrarianReturnClick(object? sender, EventArgs e)
     {
-        if (!int.TryParse(_librarianUserIdInput.Text.Trim(), out var userId) ||
-            !int.TryParse(_librarianBookIdInput.Text.Trim(), out var bookId))
+        if (_librarianLoansGrid.CurrentRow?.DataBoundItem is not ApiClient.KolcsonzesGetDto selected)
         {
-            SetLibrarianLoanFeedback("A felhasznalo es a konyv azonositoja egesz szam legyen.", true);
+            NotifyInfo("Visszavétel", "Válassz ki egy kölcsönzést a táblázatból!");
             return;
         }
 
-        var deadline = _librarianDeadlinePicker.Value.Date;
-        if (deadline < DateTime.Today)
+        SetLibrarianLoanFeedback("Visszavétel rögzítése...");
+        if (await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 1))
         {
-            SetLibrarianLoanFeedback("A hatarido nem lehet a multban.", true);
-            return;
+            SetLibrarianLoanFeedback("Könyv sikeresen visszavéve!");
+            await RefreshLibrarianLoansGrid();
         }
-
-        var loan = new LibrarianLoanMockItem(
-            _nextLibrarianLoanId++,
-            userId,
-            bookId,
-            $"Konyv #{bookId} (mock)",
-            deadline,
-            "Aktiv",
-            0,
-            0);
-        _librarianLoansData.Add(loan);
-        RefreshLibrarianLoansGrid();
-        SetLibrarianLoanFeedback($"Uj kolcsonzes rogzitve (mock). ID: {loan.Id}.");
-        SetStatusBar("Konyvtaros nezet: uj kolcsonzes (mock).", StatusTone.Success);
     }
 
-    private void HandleLibrarianReturnClick(object? sender, EventArgs e)
+    private async void HandleLibrarianExtendApproveClick(object? sender, EventArgs e)
     {
-        var selected = GetSelectedLibrarianLoan();
-        if (selected is null)
+        var selected = GetSelectedLibrarianLoanActual();
+        if (selected == null) return;
+        var ujDatum = selected.Hatarido.AddDays(7);
+        if (await ApiClient.ExtendKolcsonzesAsync(selected.Id, ujDatum))
         {
-            NotifyInfo("Visszavetel", "Valassz egy kolcsonzest a tablazatbol.");
-            return;
+            SetLibrarianLoanFeedback("Hosszabbítva!");
+            await RefreshLibrarianLoansGrid();
         }
-
-        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
-        {
-            SetLibrarianLoanFeedback("Csak aktiv kolcsonzes adhato vissza.", true);
-            return;
-        }
-
-        var idx = _librarianLoansData.FindIndex(x => x.Id == selected.Id);
-        if (idx < 0)
-        {
-            return;
-        }
-
-        var keses = Math.Max(0, (DateTime.Today - selected.Hatarido.Date).Days);
-        _librarianLoansData[idx] = selected with { Statusz = "Lezart", KesesNapok = keses };
-        RefreshLibrarianLoansGrid();
-        SetLibrarianLoanFeedback($"Visszavetel rogzitve (mock). Keses: {keses} nap.");
-        SetStatusBar("Konyvtaros nezet: visszavetel (mock).", StatusTone.Success);
-    }
-
-    private void HandleLibrarianExtendApproveClick(object? sender, EventArgs e)
-    {
-        var selected = GetSelectedLibrarianLoan();
-        if (selected is null)
-        {
-            NotifyInfo("Hosszabbitas", "Valassz egy kolcsonzest a hosszabbitashoz.");
-            return;
-        }
-
-        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
-        {
-            SetLibrarianLoanFeedback("Csak aktiv kolcsonzes hosszabbithato.", true);
-            return;
-        }
-
-        if (selected.Hosszabbitasok >= 2)
-        {
-            SetLibrarianLoanFeedback("A kolcsonzes mar elerte a max 2 hosszabbitast.", true);
-            return;
-        }
-
-        var idx = _librarianLoansData.FindIndex(x => x.Id == selected.Id);
-        if (idx < 0)
-        {
-            return;
-        }
-
-        var newDeadline = selected.Hatarido.AddDays(7);
-        _librarianLoansData[idx] = selected with { Hatarido = newDeadline, Hosszabbitasok = selected.Hosszabbitasok + 1 };
-        RefreshLibrarianLoansGrid();
-        SetLibrarianLoanFeedback($"Hosszabbitas engedelyezve (mock). Uj hatarido: {newDeadline:yyyy-MM-dd}.");
-        SetStatusBar("Konyvtaros nezet: hosszabbitas engedelyezve (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianExtendDenyClick(object? sender, EventArgs e)
     {
-        if (GetSelectedLibrarianLoan() is null)
+        if (GetSelectedLibrarianLoanActual() == null)
         {
-            NotifyInfo("Hosszabbitas", "Valassz egy kolcsonzest az elutasitashoz.");
+            NotifyInfo("Hosszabbítás", "Válassz egy kölcsönzést az elutasításhoz.");
             return;
         }
 
-        NotifyInfo("Hosszabbitas", "A hosszabbitas elutasitva (mock). Backend bekotes kesobb.");
-        SetLibrarianLoanFeedback("Hosszabbitas elutasitva (mock).");
-        SetStatusBar("Konyvtaros nezet: hosszabbitas elutasitva (mock).");
+        NotifyInfo("Hosszabbítás", "A hosszabbítási kérelem elutasítva.");
+        SetLibrarianLoanFeedback("Hosszabbítás elutasítva.");
+        SetStatusBar("Könyvtáros nézet: hosszabbítás elutasítva.");
     }
 
-    private void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
+    private async void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
     {
-        if (!int.TryParse(_librarianFineUserInput.Text.Trim(), out _))
+        if (int.TryParse(_librarianFineUserInput.Text, out var uId) &&
+            int.TryParse(_librarianFineAmountInput.Text, out var fId))
         {
-            SetLibrarianFineFeedback("A felhasznalo azonositoja egesz szam legyen.", true);
-            return;
+            if (await ApiClient.CreateBuntetesAsync(uId, fId))
+                SetLibrarianFineFeedback("Bírság kiszabva!");
         }
-
-        if (!decimal.TryParse(_librarianFineAmountInput.Text.Trim(), out var amount) || amount <= 0)
-        {
-            SetLibrarianFineFeedback("Adj meg ervenyes, pozitiv osszeget.", true);
-            return;
-        }
-
-        SetLibrarianFineFeedback($"Birsag kiszabva (mock): {amount} Ft. Megjegyzes: {_librarianFineNoteInput.Text.Trim()}");
-        SetStatusBar("Konyvtaros nezet: birsag rogzites (mock).", StatusTone.Success);
     }
 
     private void HandleLibrarianFineDeleteClick(object? sender, EventArgs e)
     {
-        NotifyInfo("Birsag", "A birsag torlese a backendhez lesz kotve (mock).");
-        SetLibrarianFineFeedback("Birsag torles (mock) — nincs valtozas a listaban.");
-        SetStatusBar("Konyvtaros nezet: birsag torles (mock).");
+        NotifyInfo("Bírság", "A törlés nem támogatott az API-n.");
     }
 
     private TabPage BuildAdminTab()
@@ -1621,15 +1572,6 @@ internal sealed record UserBookMockItem(string Cim, string Szerzo, string Katego
 
 internal sealed record UserHistoryMockItem(string Konyv, string KolcsonzesDatuma, string Hatarido, string Statusz, int Hosszabbitasok);
 
-internal sealed record LibrarianLoanMockItem(
-    int Id,
-    int FelhasznaloId,
-    int KonyvId,
-    string KonyvCim,
-    DateTime Hatarido,
-    string Statusz,
-    int KesesNapok,
-    int Hosszabbitasok);
 
 internal sealed record AdminBookMockItem(
     int Id,
