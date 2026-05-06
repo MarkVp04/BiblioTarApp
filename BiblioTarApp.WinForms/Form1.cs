@@ -465,7 +465,6 @@ public partial class Form1 : Form
             return;
         }
 
-
         _loginValidationLabel.Text = "Bejelentkezes folyamatban...";
         _loginValidationLabel.ForeColor = MutedTextColor;
         SetStatusBar("Auth UI: Bejelentkezes folyamatban...", StatusTone.Neutral);
@@ -474,16 +473,26 @@ public partial class Form1 : Form
 
         if (loginResult != null)
         {
-            _loginValidationLabel.Text = $"Sikeres bejelentkezes! Udv, {loginResult.Nev}!";
-            _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
-            SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
+            string apiSzerep = loginResult.Szerepkor?.Trim() ?? "";
+            string aktivSzerep = "Felhasznalo";
 
-            if (loginResult.Szerepkor == "Adminisztrator")
-                _roleSelector.SelectedItem = "Adminisztrator";
-            else if (loginResult.Szerepkor == "Konyvtaros")
-                _roleSelector.SelectedItem = "Konyvtaros";
-            else
-                _roleSelector.SelectedItem = "Felhasznalo";
+            string checkSzerep = apiSzerep.ToLower();
+
+            if (checkSzerep.Contains("Adminisztator"))
+            {
+                aktivSzerep = "Adminisztrator";
+            }
+            else if (checkSzerep.Contains("konyvtaros") || checkSzerep.Contains("könyvtáros"))
+            {
+                aktivSzerep = "Konyvtaros";
+            }
+
+            SetStatusBar($"Sikeres bejelentkezes. (Nyers API szerepkör: '{apiSzerep}') -> GUI: {aktivSzerep}", StatusTone.Success);
+
+            _roleSelector.SelectedItem = aktivSzerep;
+
+            ApplyRoleTabs(aktivSzerep);
+
             await LoadUserBooksFromApiAsync();
         }
         else
@@ -1064,9 +1073,6 @@ public partial class Form1 : Form
             WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight
         };
-        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Jo", (_, _) => HandleAdminSetStateClick("Jo")));
-        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Serult", (_, _) => HandleAdminSetStateClick("Serult")));
-        stateToolbar.Controls.Add(CreatePrimaryButton("Allapot: Elveszett", (_, _) => HandleAdminSetStateClick("Elveszett")));
 
         _adminStockInfoLabel = new Label { AutoSize = true, Text = "Konyvek: 0" };
 
