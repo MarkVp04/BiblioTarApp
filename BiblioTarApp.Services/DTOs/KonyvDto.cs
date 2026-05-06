@@ -50,6 +50,7 @@
         public string? Statusz { get; set; }
         public DateTime? PublikalasIdeje { get; set; }
         public bool Ertelekes { get; set; }
+        public bool Kolcsonozheto { get; set; }
     }
 
     public class KonyvDeleteDto

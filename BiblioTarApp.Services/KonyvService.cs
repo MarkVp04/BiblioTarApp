@@ -82,6 +82,8 @@ namespace BiblioTarApp.Services
             konyv.PublikalasIdeje = konyvUpdateDto.PublikalasIdeje;
             konyv.Ertelekes = konyvUpdateDto.Ertelekes;
 
+            konyv.Kolcsonozheto = konyvUpdateDto.Kolcsonozheto;
+
             _context.Konyvek.Update(konyv);
             await _context.SaveChangesAsync();
 
