@@ -183,35 +183,28 @@ public partial class Form1 : Form
 
     private void ApplyRoleTabs(string? role)
     {
-        if (_mainTabs is null)
-        {
-            return;
-        }
-
-        var selectedRole = string.IsNullOrWhiteSpace(role) ? "Felhasznalo" : role;
+        if (_mainTabs is null) return;
 
         _mainTabs.SuspendLayout();
         _mainTabs.TabPages.Clear();
+
         _mainTabs.TabPages.Add(_authTab);
 
-        switch (selectedRole)
+        _mainTabs.TabPages.Add(_userTab);
+
+        if (role == "Konyvtaros" || role == "Adminisztrator")
         {
-            case "Konyvtaros":
-                _mainTabs.TabPages.Add(_librarianTab);
-                _mainTabs.SelectedTab = _librarianTab;
-                SetStatusBar("Aktiv nezet: Konyvtaros");
-                break;
-            case "Adminisztrator":
-                _mainTabs.TabPages.Add(_adminTab);
-                _mainTabs.SelectedTab = _adminTab;
-                SetStatusBar("Aktiv nezet: Adminisztrator");
-                break;
-            default:
-                _mainTabs.TabPages.Add(_userTab);
-                _mainTabs.SelectedTab = _userTab;
-                SetStatusBar("Aktiv nezet: Felhasznalo");
-                break;
+            _mainTabs.TabPages.Add(_librarianTab);
         }
+
+        if (role == "Adminisztrator")
+        {
+            _mainTabs.TabPages.Add(_adminTab);
+        }
+
+        if (role == "Adminisztrator") _mainTabs.SelectedTab = _adminTab;
+        else if (role == "Konyvtaros") _mainTabs.SelectedTab = _librarianTab;
+        else _mainTabs.SelectedTab = _userTab;
 
         _mainTabs.ResumeLayout();
     }
@@ -479,19 +472,24 @@ public partial class Form1 : Form
             _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
             SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
 
-            if (loginResult.Szerepkor == "Adminisztrator")
-                _roleSelector.SelectedItem = "Adminisztrator";
-            else if (loginResult.Szerepkor == "Konyvtaros")
-                _roleSelector.SelectedItem = "Konyvtaros";
-            else
-                _roleSelector.SelectedItem = "Felhasznalo";
+            _roleSelector.SelectedItem = loginResult.Szerepkor;
+
+            _roleSelector.Enabled = (loginResult.Szerepkor == "Adminisztrator");
+
+            ApplyRoleTabs(loginResult.Szerepkor);
+
             await LoadUserBooksFromApiAsync();
-        }
-        else
-        {
-            _loginValidationLabel.Text = "Hibas e-mail cim vagy jelszo, esetleg nem fut az API!";
-            _loginValidationLabel.ForeColor = Color.FromArgb(185, 28, 28);
-            SetStatusBar("Auth UI: API bejelentkezes sikertelen.", StatusTone.Error);
+
+            if (loginResult.Szerepkor == "Konyvtaros" || loginResult.Szerepkor == "Adminisztrator")
+            {
+                await RefreshFoglalasokGrid();
+                await RefreshLibrarianLoansGrid();
+            }
+
+            if (loginResult.Szerepkor == "Adminisztrator")
+            {
+                RefreshAdminStockGrid();
+            }
         }
     }
 

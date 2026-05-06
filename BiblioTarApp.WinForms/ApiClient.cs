@@ -44,7 +44,6 @@ public static class ApiClient
     {
         try
         {
-            // Hozzáadtuk a /getall végződést, mert a Controllerben ez van megadva!
             var response = await Client.GetAsync("api/Konyv/getall");
 
             if (response.IsSuccessStatusCode)
@@ -52,7 +51,6 @@ public static class ApiClient
                 return await response.Content.ReadFromJsonAsync<List<KonyvDto>>();
             }
 
-            // Itt érdemes megnézni, mi a hiba (401? 403? 404?)
             var errorLog = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"API Hiba: {response.StatusCode} - {errorLog}");
 
