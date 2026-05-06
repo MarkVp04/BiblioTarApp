@@ -468,11 +468,12 @@ public partial class Form1 : Form
         if (loginResult != null)
         {
             _currentUserId = loginResult.FelhasznaloId;
-            _loginValidationLabel.Text = $"Sikeres bejelentkezes! Udv, {loginResult.Nev}!";
+            _loginValidationLabel.Text = $"Sikeres bejelentkezés! Üdv, {loginResult.Nev}!";
             _loginValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
-            SetStatusBar($"Sikeres bejelentkezes. Token elmentve. Szerepkor: {loginResult.Szerepkor}", StatusTone.Success);
+            SetStatusBar($"Sikeres bejelentkezés. Szerepkör: {loginResult.Szerepkor}", StatusTone.Success);
 
-            _roleSelector.SelectedItem = loginResult.Szerepkor;
+            string uiRoleName = loginResult.Szerepkor == "Regisztralt" ? "Felhasznalo" : loginResult.Szerepkor;
+            _roleSelector.SelectedItem = uiRoleName;
 
             _roleSelector.Enabled = (loginResult.Szerepkor == "Adminisztrator");
 
@@ -485,11 +486,6 @@ public partial class Form1 : Form
                 await RefreshFoglalasokGrid();
                 await RefreshLibrarianLoansGrid();
             }
-
-            if (loginResult.Szerepkor == "Adminisztrator")
-            {
-                RefreshAdminStockGrid();
-            }
         }
     }
 
@@ -500,6 +496,8 @@ public partial class Form1 : Form
         var password = _registerPasswordInput.Text;
         var confirmPassword = _registerPasswordAgainInput.Text;
 
+        var phone = _registerPhoneInput.Text.Trim();
+
         int szerepkorValue = _registerRoleInput.SelectedItem?.ToString() switch
         {
             "Konyvtaros" => 2,
@@ -508,25 +506,34 @@ public partial class Form1 : Form
         };
 
 
-        if (password != confirmPassword)
-        {
-            _registerValidationLabel.Text = "A ket jelszo nem egyezik!";
-            return;
-        }
+        SetStatusBar("Regisztráció folyamatban...", StatusTone.Neutral);
+        _registerValidationLabel.Text = "Küldés...";
+        _registerValidationLabel.ForeColor = MutedTextColor;
 
-        SetStatusBar("Regisztracio folyamatban...", StatusTone.Neutral);
-
-        bool success = await ApiClient.RegisterAsync(name, email, password, szerepkorValue);
+        bool success = await ApiClient.RegisterAsync(name, email, password, phone, szerepkorValue);
 
         if (success)
         {
-            _registerValidationLabel.Text = "Sikeres regisztracio!";
-            SetStatusBar("Regisztracio sikeres.", StatusTone.Success);
+            _registerValidationLabel.Text = "Sikeres regisztráció!";
+            _registerValidationLabel.ForeColor = Color.FromArgb(22, 163, 74);
+            SetStatusBar("Regisztráció sikeres.", StatusTone.Success);
+
+            _registerNameInput.Clear();
+            _registerEmailInput.Clear();
+            _registerPhoneInput.Clear();
+            _registerPasswordInput.Clear();
+            _registerPasswordAgainInput.Clear();
+
+            if (_registerRoleInput.Items.Count > 0)
+            {
+                _registerRoleInput.SelectedIndex = 0;
+            }
         }
         else
         {
-            _registerValidationLabel.Text = "Hiba a regisztracio soran.";
-            SetStatusBar("Regisztracios hiba az API-n.", StatusTone.Error);
+            _registerValidationLabel.Text = "Hiba a regisztráció során!";
+            _registerValidationLabel.ForeColor = Color.Red;
+            SetStatusBar("Regisztrációs hiba az API-n.", StatusTone.Error);
         }
     }
 

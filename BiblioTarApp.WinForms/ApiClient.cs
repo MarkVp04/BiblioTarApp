@@ -62,13 +62,14 @@ public static class ApiClient
             return null;
         }
     }
-    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo, int szerepkor)
+    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo,string telefonszam, int szerepkor)
     {
         var registerData = new
         {
             Nev = nev,
             Email = email,
             Jelszo = jelszo,
+            Telefonszam = telefonszam,
             Szerepkor = szerepkor
         };
 
