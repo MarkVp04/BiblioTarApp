@@ -155,7 +155,6 @@ public partial class Form1 : Form
         titlePanel.Controls.Add(new Label
         {
             AutoSize = true,
-            Text = "Szerepkoronkent elokeszitett feluletek, backend funkcionalitas nelkul."
         }, 0, 1);
 
         var rolePanel = new FlowLayoutPanel
@@ -354,7 +353,7 @@ public partial class Form1 : Form
             {
                 foreach (DataGridViewRow row in _adminStockGrid.Rows)
                 {
-                    if (row.DataBoundItem is KonyvDto book && book.Id == id) // Ez így már jó lesz, ha a névtér tiszta
+                    if (row.DataBoundItem is KonyvDto book && book.Id == id)
                         {
                         row.Selected = true;
                         _adminStockGrid.CurrentCell = row.Cells.Count > 0 ? row.Cells[0] : null;
@@ -1051,7 +1050,7 @@ public partial class Form1 : Form
             FlowDirection = FlowDirection.LeftToRight
         };
         stockToolbar.Controls.Add(CreatePrimaryButton("Uj konyv", HandleAdminNewBookClick));
-        stockToolbar.Controls.Add(CreatePrimaryButton("Modositas (betoltes)", HandleAdminReloadSelectionClick));
+        stockToolbar.Controls.Add(CreatePrimaryButton("Modositas", HandleAdminReloadSelectionClick));
         stockToolbar.Controls.Add(CreatePrimaryButton("Torles", HandleAdminDeleteClick));
         stockToolbar.Controls.Add(CreatePrimaryButton("Frissites", HandleAdminRefreshClick));
 
@@ -1092,7 +1091,7 @@ public partial class Form1 : Form
         _adminIsbnInput = new TextBox();
         _adminKategoriaInput = new TextBox();
         _adminKiadasevInput = new TextBox();
-        _adminKolcsonozhetoCheck = new CheckBox { Text = "Kolcsonozheto", AutoSize = true };
+        _adminKolcsonozhetoCheck = new CheckBox { Text = "", AutoSize = true };
         _adminAllapotCombo = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
@@ -1104,7 +1103,7 @@ public partial class Form1 : Form
         AddRow(detailsForm, "ISBN", _adminIsbnInput);
         AddRow(detailsForm, "Kategoria", _adminKategoriaInput);
         AddRow(detailsForm, "Kiadas eve *", _adminKiadasevInput);
-        AddRow(detailsForm, "", _adminKolcsonozhetoCheck);
+        AddRow(detailsForm, "Kölcsönözhető", _adminKolcsonozhetoCheck);
         AddRow(detailsForm, "Allapot", _adminAllapotCombo);
 
         var detailButtons = new FlowLayoutPanel
@@ -1296,6 +1295,11 @@ public partial class Form1 : Form
         var cim = _adminCimInput.Text.Trim();
         var szerzo = _adminSzerzoInput.Text.Trim();
 
+        var kategoria = string.IsNullOrWhiteSpace(_adminKategoriaInput.Text) ? "Egyéb" : _adminKategoriaInput.Text.Trim();
+        var isbn = string.IsNullOrWhiteSpace(_adminIsbnInput.Text) ? null : _adminIsbnInput.Text.Trim();
+        var allapot = _adminAllapotCombo.SelectedItem?.ToString() ?? "Jo";
+        var kolcsonozheto = _adminKolcsonozhetoCheck.Checked;
+
         if (string.IsNullOrWhiteSpace(cim) || string.IsNullOrWhiteSpace(szerzo))
         {
             SetAdminDetailFeedback("A cím és a szerző megadása kötelező.", true);
@@ -1308,10 +1312,6 @@ public partial class Form1 : Form
             return;
         }
 
-        var kategoria = string.IsNullOrWhiteSpace(_adminKategoriaInput.Text) ? "Egyéb" : _adminKategoriaInput.Text.Trim();
-        var isbn = string.IsNullOrWhiteSpace(_adminIsbnInput.Text) ? null : _adminIsbnInput.Text.Trim();
-        var allapot = _adminAllapotCombo.SelectedItem?.ToString() ?? "Jo";
-        var kolcsonozheto = _adminKolcsonozhetoCheck.Checked;
 
         SetStatusBar("Mentés folyamatban...", StatusTone.Neutral);
 
@@ -1337,7 +1337,6 @@ public partial class Form1 : Form
                 var selected = GetSelectedAdminBook();
                 if (selected is null)
                 {
-                    // JAVÍTÁS: Kilépés helyett jelezzük a hibát a felhasználónak!
                     SetAdminDetailFeedback("Nincs kiválasztva könyv! Új könyv felvételéhez előbb kattints az 'Új könyv' gombra.", true);
                     SetStatusBar("Mentés megszakítva.", StatusTone.Warning);
                     return;
@@ -1363,9 +1362,20 @@ public partial class Form1 : Form
             if (success)
             {
                 SetAdminDetailFeedback(_adminIsNewBookMode ? "Új könyv sikeresen mentve." : "Könyv módosítva.");
-                ClearAdminDetailForm();
+
+                if (_adminIsNewBookMode)
+                {
+                    ClearAdminDetailForm();
+                }
+
                 _adminIsNewBookMode = false;
                 HandleAdminRefreshClick(null, null);
+
+                var currentBook = GetSelectedAdminBook();
+                if (currentBook != null)
+                {
+                    LoadAdminDetailFromBook(currentBook);
+                }
             }
             else
             {
@@ -1416,27 +1426,6 @@ public partial class Form1 : Form
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         return layout;
-    }
-
-    private static Control CreateButtonsRow(params string[] captions)
-    {
-        var flow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = true,
-            Margin = new Padding(0, 6, 0, 0),
-            Padding = new Padding(0),
-            FlowDirection = FlowDirection.LeftToRight
-        };
-
-        foreach (var caption in captions)
-        {
-            flow.Controls.Add(CreateActionButton(caption));
-        }
-
-        return flow;
     }
 
     private static Button CreateActionButton(string text)
@@ -1552,7 +1541,17 @@ public partial class Form1 : Form
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var rowIndex = panel.RowCount++;
         panel.Controls.Add(new Label { Text = labelText, AutoSize = true, Margin = new Padding(3, 10, 10, 8) }, 0, rowIndex);
-        control.Dock = DockStyle.Top;
+
+        // Pipa (CheckBox) esetén ne húzzuk szét teljes szélességre
+        if (control is CheckBox)
+        {
+            control.Dock = DockStyle.Left;
+        }
+        else
+        {
+            control.Dock = DockStyle.Top;
+        }
+
         control.Margin = new Padding(3, 6, 3, 6);
         panel.Controls.Add(control, 1, rowIndex);
     }

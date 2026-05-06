@@ -35,7 +35,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpDelete]
         [Route("remove/{id}")]
-        [Authorize(Policy = "AdminPolicy")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> Delete(int id)
         {
             try

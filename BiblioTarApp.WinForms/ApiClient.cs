@@ -132,18 +132,20 @@ public static class ApiClient
     {
         try
         {
-            // A KonyvService.Delete(id) metódust a vezérlőnek a "remove/{id}"-n keresztül kell hívnia
             var response = await Client.DeleteAsync($"api/Konyv/remove/{id}");
 
-            if (response.IsSuccessStatusCode) return true;
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
 
             var errorMsg = await response.Content.ReadAsStringAsync();
-            MessageBox.Show($"Törlési hiba: {errorMsg}");
+            MessageBox.Show($"Törlési hiba!\nStátuszkód: {(int)response.StatusCode} ({response.StatusCode})\nSzerver üzenete: {errorMsg}", "Hiba", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Hálózati hiba: {ex.Message}");
+            MessageBox.Show($"Hálózati hiba: {ex.Message}", "Kritikus hiba", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return false;
         }
     }
