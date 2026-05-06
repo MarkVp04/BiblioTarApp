@@ -120,13 +120,14 @@ namespace BiblioTarApp.Services
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, felhasznalo.Id.ToString()),
-        new Claim(ClaimTypes.Name, felhasznalo.Nev),
-        new Claim(ClaimTypes.Email, felhasznalo.Email),
-        new Claim(ClaimTypes.Role, felhasznalo.Szerepkor.ToString()),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-    };
+            {
+                new Claim(ClaimTypes.NameIdentifier, felhasznalo.Id.ToString()),
+                new Claim(ClaimTypes.Name, felhasznalo.Nev),
+                new Claim(ClaimTypes.Email, felhasznalo.Email),
+                new Claim(ClaimTypes.Role, felhasznalo.Szerepkor.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("Id", felhasznalo.Id.ToString())
+            };
 
             var expires = DateTime.Now.AddDays(
                 Convert.ToDouble(_configuration["JwtSettings:ExpiresInDays"]));

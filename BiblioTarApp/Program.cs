@@ -46,13 +46,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminPolicy",
-        policy => policy.RequireRole("Adminisztrator"));
+        policy => policy.RequireRole("Adminisztrator", "Adminisztrátor", "Admin", "admin"));
 
     options.AddPolicy("StaffPolicy",
-        policy => policy.RequireRole("Konyvtaros", "Adminisztrator"));
+        policy => policy.RequireRole("Konyvtaros", "Adminisztrator", "Admin"));
 
     options.AddPolicy("AllUserPolicy",
-        policy => policy.RequireRole("Regisztralt", "Konyvtaros", "Adminisztrator"));
+        policy => policy.RequireRole("Regisztralt", "Konyvtaros", "Adminisztrator", "Admin", "felhasznalo", "Felhasznalo"));
 });
 
 // Swagger
