@@ -7,7 +7,8 @@ namespace BiblioTarApp.DataContext.Entites
     {
         Aktiv = 1,
         Teljesitett = 2,
-        Torolve = 3
+        Torolve = 3,
+        HosszabbitasraVaro = 4
     }
 
     public class Kolcsonzes

@@ -71,6 +71,7 @@ namespace BiblioTarApp.Services
             };
 
             foglalas.Konyv.Statusz = KonyvStatusz.NemElerheto.ToString();
+            foglalas.Statusz = FoglalasStatusz.Visszahozott;
 
             await _context.Kolcsonzesek.AddAsync(kolcsonzes);
             _context.Konyvek.Update(foglalas.Konyv);

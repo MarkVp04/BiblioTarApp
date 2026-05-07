@@ -33,6 +33,7 @@ public partial class Form1 : Form
     private ComboBox _registerRoleInput = null!;
     private Label _registerValidationLabel = null!;
     private TextBox _userSearchInput = null!;
+    private DataGridView _librarianFinesGrid = null!;
     private DataGridView _userBooksGrid = null!;
     private DataGridView _userHistoryGrid = null!;
     private Label _userBooksInfoLabel = null!;
@@ -692,10 +693,10 @@ public partial class Form1 : Form
 
         _userHistoryGrid.DataSource = _userHistoryData.Select(x => new
         {
+            x.Id,
             Könyv = x.KonyvCim,
             Szerző = string.IsNullOrEmpty(x.Szerzo) ? "Nincs az API válaszban" : x.Szerzo,
-
-            Kölcsönzés = x.KolcsozesIdeje.Year < 2000 ? "Nincs adat" : x.KolcsozesIdeje.ToString("yyyy.MM.dd"),
+            Kölcsönzés = x.KolcsonzesIdeje.Year < 2000 ? "Nincs adat" : x.KolcsonzesIdeje.ToString("yyyy.MM.dd"),
             Határidő = x.Hatarido.ToString("yyyy.MM.dd"),
 
             Státusz = x.Statusz switch
@@ -703,10 +704,12 @@ public partial class Form1 : Form
                 1 => "Aktív",
                 2 => "Teljesített",
                 3 => "Törölve",
+                4 => "Hosszabbításra vár",
                 _ => "Ismeretlen"
             },
             Hosszabbítások = x.MeghosszabbitasiLehetosegek
         }).ToList();
+
 
         _userHistoryInfoLabel.Text = _userHistoryData.Count == 0
             ? "Nincs kölcsönzési előzmény."
@@ -745,18 +748,35 @@ public partial class Form1 : Form
         SetStatusBar("Kölcsönzési előzmények frissítve.", StatusTone.Success);
     }
 
-    private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
+    private async void HandleUserHistoryExtendClick(object? sender, EventArgs e)
     {
         if (_userHistoryGrid.CurrentRow == null)
         {
-            NotifyInfo("Hosszabbítás", "Válassz kölcsönzést.");
+            NotifyInfo("Hosszabbítás", "Válassz ki egy aktív kölcsönzést!");
             return;
         }
 
-        NotifyInfo(
-            "Hosszabbítás",
-            "A hosszabbítás backend bekötése még nincs implementálva ehhez a listához."
-        );
+        dynamic selected = _userHistoryGrid.CurrentRow.DataBoundItem;
+
+        if (selected.Státusz != "Aktív")
+        {
+            NotifyWarning("Hiba", "Csak aktív kölcsönzésre kérhetsz hosszabbítást!");
+            return;
+        }
+
+        if (selected.Hosszabbítások <= 0)
+        {
+            NotifyWarning("Hiba", "Nincs több hosszabbítási lehetőséged!");
+            return;
+        }
+
+        bool siker = await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 4);
+
+        if (siker)
+        {
+            NotifyInfo("Siker", "Hosszabbítási kérelem elküldve a könyvtárosnak.");
+            await LoadUserHistoryFromApiAsync();
+        }
     }
 
     private TabPage BuildLibrarianTab()
@@ -765,24 +785,19 @@ public partial class Form1 : Form
         var layout = CreateTwoColumnLayout();
         tab.Controls.Add(layout);
 
-        var loanGroup = new GroupBox { Text = "Kolcsonzes kezeles", Dock = DockStyle.Fill };
-        var loanOuter = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 5,
-            Padding = new Padding(12)
-        };
-        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize)); 
-        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize)); 
+        // BAL OLDAL (Kölcsönzések és Foglalások - marad a korábbi szerint)
+        var loanGroup = new GroupBox { Text = "Kölcsönzések és Foglalások", Dock = DockStyle.Fill };
+        var loanOuter = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(12, 0, 12, 12) };
         loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        loanOuter.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        loanOuter.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
         var loanForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         loanForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        loanForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-
         _librarianUserIdInput = new TextBox();
         _librarianBookIdInput = new TextBox();
         _librarianDeadlinePicker = new DateTimePicker { Format = DateTimePickerFormat.Short, MinDate = DateTime.Today };
@@ -790,46 +805,29 @@ public partial class Form1 : Form
         AddRow(loanForm, "Foglalas ID *", _librarianBookIdInput);
         AddRow(loanForm, "Hatarido *", _librarianDeadlinePicker);
 
-        var loanButtons = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight
-        };
+        var loanButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         loanButtons.Controls.Add(CreatePrimaryButton("Kolcsonzes rogzitese", HandleLibrarianLoanCreateClick));
+        loanButtons.Controls.Add(CreatePrimaryButton("Foglalás elutasítása", HandleLibrarianReservationDenyClick));
         loanButtons.Controls.Add(CreatePrimaryButton("Visszavetel", HandleLibrarianReturnClick));
         loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas engedelyezese", HandleLibrarianExtendApproveClick));
         loanButtons.Controls.Add(CreatePrimaryButton("Hosszabbitas elutasitasa", HandleLibrarianExtendDenyClick));
 
         _librarianFoglalasokGrid = CreateMockDataGrid();
-        _librarianFoglalasokGrid.MinimumSize = new Size(100, 150);
-        _librarianFoglalasokGrid.Height = 200;
-        _librarianFoglalasokGrid.SelectionChanged += HandleFoglalasSelectionChanged;
-
-        loanOuter.Controls.Add(new Label { Text = "Aktuális foglalások (Válassz ki egyet):", AutoSize = true, Font = new Font(BaseFont, FontStyle.Bold) }, 0, 3);
-        loanOuter.Controls.Add(_librarianFoglalasokGrid, 0, 4);
-
-        _librarianLoanFeedbackLabel = new Label
-        {
-            AutoSize = true,
-            Text = "Valassz sort a tablazatban (jobb oldal) vagy rogzits uj kolcsonzest.",
-            ForeColor = MutedTextColor
-        };
+        _librarianLoansGrid = CreateMockDataGrid();
+        _librarianLoanFeedbackLabel = new Label { AutoSize = true, Text = "Válassz ki egy elemet.", ForeColor = MutedTextColor };
 
         loanOuter.Controls.Add(loanForm, 0, 0);
         loanOuter.Controls.Add(loanButtons, 0, 1);
         loanOuter.Controls.Add(_librarianLoanFeedbackLabel, 0, 2);
+        loanOuter.Controls.Add(new Label { Text = "Aktuális foglalások:", AutoSize = true, Font = new Font(BaseFont, FontStyle.Bold) }, 0, 3);
+        loanOuter.Controls.Add(_librarianFoglalasokGrid, 0, 4);
+        loanOuter.Controls.Add(new Label { Text = "Aktív kölcsönzések:", AutoSize = true, Font = new Font(BaseFont, FontStyle.Bold) }, 0, 5);
+        loanOuter.Controls.Add(_librarianLoansGrid, 0, 6);
         loanGroup.Controls.Add(loanOuter);
 
-        var fineGroup = new GroupBox { Text = "Birsag es kolcsonzesek", Dock = DockStyle.Fill };
-        var fineOuter = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 4,
-            Padding = new Padding(12)
-        };
+        var fineGroup = new GroupBox { Text = "Bírságok kezelése", Dock = DockStyle.Fill };
+        var fineOuter = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 0, 12, 12) };
+        fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         fineOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -837,7 +835,6 @@ public partial class Form1 : Form
 
         var fineForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         fineForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        fineForm.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _librarianFineUserInput = new TextBox();
         _librarianFineAmountInput = new TextBox();
         _librarianFineNoteInput = new TextBox();
@@ -845,29 +842,17 @@ public partial class Form1 : Form
         AddRow(fineForm, "Osszeg (Ft) *", _librarianFineAmountInput);
         AddRow(fineForm, "Megjegyzes", _librarianFineNoteInput);
 
-        var fineButtons = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight
-        };
+        var fineButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         fineButtons.Controls.Add(CreatePrimaryButton("Birsag kiszabasa", HandleLibrarianFineCreateClick));
-        fineButtons.Controls.Add(CreatePrimaryButton("Birsag torlese (mock)", HandleLibrarianFineDeleteClick));
 
-        _librarianFineFeedbackLabel = new Label
-        {
-            AutoSize = true,
-            Text = "A birsag rogzitese a keseshez kotodik (mock).",
-            ForeColor = MutedTextColor
-        };
-
-        _librarianLoansGrid = CreateMockDataGrid();
+        _librarianFineFeedbackLabel = new Label { AutoSize = true, Text = "Kiszabott bírságok listája.", ForeColor = MutedTextColor };
+        _librarianFinesGrid = CreateMockDataGrid(); // Az új bírság lista
 
         fineOuter.Controls.Add(fineForm, 0, 0);
         fineOuter.Controls.Add(fineButtons, 0, 1);
         fineOuter.Controls.Add(_librarianFineFeedbackLabel, 0, 2);
-        fineOuter.Controls.Add(_librarianLoansGrid, 0, 3);
+        fineOuter.Controls.Add(new Label { Text = "Bírságok előzményei:", AutoSize = true, Font = new Font(BaseFont, FontStyle.Bold) }, 0, 3);
+        fineOuter.Controls.Add(_librarianFinesGrid, 0, 4);
         fineGroup.Controls.Add(fineOuter);
 
         layout.Controls.Add(loanGroup, 0, 0);
@@ -887,36 +872,78 @@ public partial class Form1 : Form
         }
     }
 
+    private async void HandleLibrarianReservationDenyClick(object? sender, EventArgs e)
+    {
+        if (_librarianFoglalasokGrid.CurrentRow?.DataBoundItem == null)
+        {
+            NotifyInfo("Hiba", "Válassz ki egy foglalást az elutasításhoz!");
+            return;
+        }
+        dynamic selected = _librarianFoglalasokGrid.CurrentRow.DataBoundItem;
+
+        if (ConfirmWarning("Elutasítás", "Biztosan elutasítod ezt a foglalást?"))
+        {
+            if (await ApiClient.UpdateFoglalasStatuszAsync(selected.Id, 4))
+            {
+                SetLibrarianLoanFeedback("Foglalás elutasítva.");
+                await RefreshFoglalasokGrid();
+            }
+        }
+    }
+
     private async Task RefreshLibrarianLoansGrid()
     {
-        SetStatusBar("Kölcsönzések betöltése...", StatusTone.Neutral);
         var kolcsonzesek = await ApiClient.GetAllKolcsonzesAsync();
         _librarianLoansGrid.DataSource = null;
         if (kolcsonzesek != null)
         {
-            _librarianLoansGrid.DataSource = kolcsonzesek;
-            SetStatusBar("Kölcsönzések frissítve.", StatusTone.Success);
+            _librarianLoansGrid.DataSource = kolcsonzesek.Select(k => new {
+                k.Id,
+                k.Statusz,
+                k.Hatarido,
+                Email = k.Email,
+                Könyv = k.KonyvCim,
+                Kölcsönzés = k.KolcsonzesIdeje.Year < 2000 ? "Nincs adat" : k.KolcsonzesIdeje.ToString("yyyy.MM.dd"),
+                Határidő = k.Hatarido.ToString("yyyy.MM.dd"),
+                Státusz = k.Statusz switch
+                {
+                    1 => "Aktív",
+                    4 => "Hosszabbításra vár",
+                    5 => "Meghosszabbítva",
+                    _ => "Lezárt/Egyéb"
+                },
+                Hosszabbítások = k.MeghosszabbitasiLehetosegek
+            }).ToList();
+
+            if (_librarianLoansGrid.Columns["Statusz"] != null) _librarianLoansGrid.Columns["Statusz"].Visible = false;
+            if (_librarianLoansGrid.Columns["Hatarido"] != null) _librarianLoansGrid.Columns["Hatarido"].Visible = false;
         }
     }
     private async Task RefreshFoglalasokGrid()
     {
-        if (string.IsNullOrEmpty(ApiClient.Token))
-        {
-            return;
-        }
-
         var foglalasok = await ApiClient.GetAllFoglalasAsync();
         _librarianFoglalasokGrid.DataSource = null;
-
         if (foglalasok != null)
         {
-            _librarianFoglalasokGrid.DataSource = foglalasok.ToList();
+            _librarianFoglalasokGrid.DataSource = foglalasok.Select(f => new {
+                f.Id,
+                Felhasznalo = f.FelhasznaloId,
+                Könyv = f.KonyvCim,
+                Dátum = f.FoglalasIdeje.ToString("yyyy.MM.dd HH:mm"),
+                Státusz = f.Statusz switch
+                {
+                    1 => "Kölcsönzésre vár",
+                    2 => "Kikölcsönözve",
+                    4 => "Elutasítva",
+                    _ => "Egyéb"
+                }
+            }).ToList();
         }
     }
 
-    private ApiClient.KolcsonzesGetDto? GetSelectedLibrarianLoanActual()
+    private dynamic? GetSelectedLibrarianLoanActual()
     {
-        return _librarianLoansGrid.CurrentRow?.DataBoundItem as ApiClient.KolcsonzesGetDto;
+        return _librarianLoansGrid.CurrentRow?.DataBoundItem;
     }
 
     private void SetLibrarianLoanFeedback(string text, bool isError = false)
@@ -946,6 +973,7 @@ public partial class Form1 : Form
         {
             SetLibrarianLoanFeedback("Sikeres kölcsönzés!");
             await RefreshLibrarianLoansGrid();
+            await RefreshFoglalasokGrid();
         }
         else
         {
@@ -955,14 +983,15 @@ public partial class Form1 : Form
 
     private async void HandleLibrarianReturnClick(object? sender, EventArgs e)
     {
-        if (_librarianLoansGrid.CurrentRow?.DataBoundItem is not ApiClient.KolcsonzesGetDto selected)
+        var selected = GetSelectedLibrarianLoanActual();
+        if (selected == null)
         {
             NotifyInfo("Visszavétel", "Válassz ki egy kölcsönzést a táblázatból!");
             return;
         }
 
         SetLibrarianLoanFeedback("Visszavétel rögzítése...");
-        if (await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 1))
+        if (await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 2))
         {
             SetLibrarianLoanFeedback("Könyv sikeresen visszavéve!");
             await RefreshLibrarianLoansGrid();
@@ -973,34 +1002,92 @@ public partial class Form1 : Form
     {
         var selected = GetSelectedLibrarianLoanActual();
         if (selected == null) return;
-        var ujDatum = selected.Hatarido.AddDays(7);
-        if (await ApiClient.ExtendKolcsonzesAsync(selected.Id, ujDatum))
+
+        if (selected.Statusz != 4)
         {
-            SetLibrarianLoanFeedback("Hosszabbítva!");
-            await RefreshLibrarianLoansGrid();
+            NotifyInfo("Hosszabbítás", "Ez a kölcsönzés nem vár jóváhagyásra.");
+            return;
+        }
+
+        DateTime ujDatum = selected.Hatarido.AddDays(7);
+
+        if (await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 1))
+        {
+            if (await ApiClient.ExtendKolcsonzesAsync(selected.Id, ujDatum))
+            {
+                SetLibrarianLoanFeedback("Hosszabbítás sikeresen jóváhagyva!");
+                await RefreshLibrarianLoansGrid();
+            }
+            else
+            {
+                SetLibrarianLoanFeedback("A dátumot nem sikerült módosítani.", true);
+            }
+        }
+        else
+        {
+            SetLibrarianLoanFeedback("Hiba történt a státusz visszaállításakor.", true);
         }
     }
 
-    private void HandleLibrarianExtendDenyClick(object? sender, EventArgs e)
+    private async void HandleLibrarianExtendDenyClick(object? sender, EventArgs e)
     {
-        if (GetSelectedLibrarianLoanActual() == null)
+        var selected = GetSelectedLibrarianLoanActual();
+        if (selected == null)
         {
             NotifyInfo("Hosszabbítás", "Válassz egy kölcsönzést az elutasításhoz.");
             return;
         }
 
-        NotifyInfo("Hosszabbítás", "A hosszabbítási kérelem elutasítva.");
-        SetLibrarianLoanFeedback("Hosszabbítás elutasítva.");
-        SetStatusBar("Könyvtáros nézet: hosszabbítás elutasítva.");
+        if (selected.Statusz == 4)
+        {
+            if (await ApiClient.UpdateKolcsonzesStatuszAsync(selected.Id, 1))
+            {
+                SetLibrarianLoanFeedback("Hosszabbítás elutasítva, státusz visszaállítva.");
+                await RefreshLibrarianLoansGrid();
+            }
+        }
     }
 
     private async void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
     {
-        if (int.TryParse(_librarianFineUserInput.Text, out var uId) &&
-            int.TryParse(_librarianFineAmountInput.Text, out var fId))
+        if (!int.TryParse(_librarianFineUserInput.Text, out var uId) ||
+            !int.TryParse(_librarianFineAmountInput.Text, out var osszeg))
         {
-            if (await ApiClient.CreateBuntetesAsync(uId, fId))
-                SetLibrarianFineFeedback("Bírság kiszabva!");
+            SetLibrarianFineFeedback("Hiba: Felhasználó ID és Összeg megadása kötelező (szám)!", true);
+            return;
+        }
+
+        string megjegyzes = _librarianFineNoteInput.Text.Trim();
+
+        SetLibrarianFineFeedback("Bírság rögzítése...");
+
+        if (await ApiClient.CreateBuntetesDetailedAsync(uId, osszeg, megjegyzes))
+        {
+            SetLibrarianFineFeedback("Bírság sikeresen kiszabva!");
+            _librarianFineUserInput.Clear();
+            _librarianFineAmountInput.Clear();
+            _librarianFineNoteInput.Clear();
+            await RefreshFinesGrid(); 
+        }
+        else
+        {
+            SetLibrarianFineFeedback("Hiba történt a bírság rögzítésekor!", true);
+        }
+    }
+
+    private async Task RefreshFinesGrid()
+    {
+        var buntetesek = await ApiClient.GetAllBuntetesAsync();
+        _librarianFinesGrid.DataSource = null;
+        if (buntetesek != null)
+        {
+            _librarianFinesGrid.DataSource = buntetesek.Select(b => new {
+                ID = b.Id,
+                Felhasználó = b.FelhasznaloNev,
+                Összeg = $"{b.Osszeg} Ft",
+                Megjegyzés = b.Megjegyzes,
+                Dátum = b.Datum.ToString("yyyy.MM.dd")
+            }).ToList();
         }
     }
 

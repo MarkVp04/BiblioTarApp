@@ -64,9 +64,10 @@ public static class ApiClient
 
     public class KolcsonzesHistoryDto
     {
+        public int Id { get; set; }
         public string KonyvCim { get; set; } = string.Empty;
         public string Szerzo { get; set; } = string.Empty;
-        public DateTime KolcsozesIdeje { get; set; } 
+        public DateTime KolcsonzesIdeje { get; set; } 
         public DateTime Hatarido { get; set; }
         public int Statusz { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }
@@ -136,6 +137,15 @@ public static class ApiClient
             MessageBox.Show($"Hálózati hiba: {ex.Message}", "Hiba", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return false;
         }
+    }
+    public static async Task<bool> UpdateFoglalasStatuszAsync(int foglalasId, int statusz)
+    {
+        try
+        {
+            var response = await Client.PutAsJsonAsync("api/Foglalas/status", new { Id = foglalasId, Statusz = statusz });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
     }
 
     public static async Task<bool> UpdateKonyvAsync(int id, KonyvUpdateDto modositottKonyv)
@@ -266,6 +276,48 @@ public static class ApiClient
         public DateTime Hatarido { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }
         public int Statusz { get; set; }
+    }
+
+    public class BuntetesGetDto
+    {
+        public int Id { get; set; }
+        public string FelhasznaloNev { get; set; } = string.Empty;
+        public int Osszeg { get; set; }
+        public string Megjegyzes { get; set; } = string.Empty;
+        public DateTime Datum { get; set; }
+    }
+
+    public static async Task<bool> CreateBuntetesDetailedAsync(int felhasznaloId, int osszeg, string megjegyzes)
+    {
+        try
+        {
+            var adat = new { FelhasznaloId = felhasznaloId, Osszeg = osszeg, Megjegyzes = megjegyzes };
+            var response = await Client.PostAsJsonAsync("api/Buntetes/create", adat);
+
+            if (response.IsSuccessStatusCode) return true;
+
+            var hibaUzenet = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"Szerver hiba: {response.StatusCode}\nÜzenet: {hibaUzenet}",
+                            "Bírság rögzítési hiba", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba: {ex.Message}");
+            return false;
+        }
+    }
+
+    public static async Task<List<BuntetesGetDto>?> GetAllBuntetesAsync()
+    {
+        try
+        {
+            var response = await Client.GetAsync("api/Buntetes/getall");
+            if (response.IsSuccessStatusCode)
+                return await response.Content.ReadFromJsonAsync<List<BuntetesGetDto>>();
+            return null;
+        }
+        catch { return null; }
     }
 
     public static async Task<List<FoglalasGetDto>?> GetAllFoglalasAsync()
