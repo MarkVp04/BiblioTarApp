@@ -41,6 +41,7 @@ public partial class Form1 : Form
     private List<ApiClient.KolcsonzesHistoryDto> _userHistoryData = new();
     private TextBox _librarianUserIdInput = null!;
     private TextBox _librarianBookIdInput = null!;
+    private TextBox _librarianFineLoanIdInput = null!;
     private DateTimePicker _librarianDeadlinePicker = null!;
     private Label _librarianLoanFeedbackLabel = null!;
     private TextBox _librarianFineUserInput = null!;
@@ -785,7 +786,6 @@ public partial class Form1 : Form
         var layout = CreateTwoColumnLayout();
         tab.Controls.Add(layout);
 
-        // BAL OLDAL (Kölcsönzések és Foglalások - marad a korábbi szerint)
         var loanGroup = new GroupBox { Text = "Kölcsönzések és Foglalások", Dock = DockStyle.Fill };
         var loanOuter = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(12, 0, 12, 12) };
         loanOuter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -836,9 +836,12 @@ public partial class Form1 : Form
         var fineForm = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         fineForm.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
         _librarianFineUserInput = new TextBox();
+        _librarianFineLoanIdInput = new TextBox();
         _librarianFineAmountInput = new TextBox();
         _librarianFineNoteInput = new TextBox();
+
         AddRow(fineForm, "Felhasznalo ID *", _librarianFineUserInput);
+        AddRow(fineForm, "Kölcsönzés ID *", _librarianFineLoanIdInput);
         AddRow(fineForm, "Osszeg (Ft) *", _librarianFineAmountInput);
         AddRow(fineForm, "Megjegyzes", _librarianFineNoteInput);
 
@@ -846,7 +849,7 @@ public partial class Form1 : Form
         fineButtons.Controls.Add(CreatePrimaryButton("Birsag kiszabasa", HandleLibrarianFineCreateClick));
 
         _librarianFineFeedbackLabel = new Label { AutoSize = true, Text = "Kiszabott bírságok listája.", ForeColor = MutedTextColor };
-        _librarianFinesGrid = CreateMockDataGrid(); // Az új bírság lista
+        _librarianFinesGrid = CreateMockDataGrid();
 
         fineOuter.Controls.Add(fineForm, 0, 0);
         fineOuter.Controls.Add(fineButtons, 0, 1);
@@ -1050,28 +1053,25 @@ public partial class Form1 : Form
 
     private async void HandleLibrarianFineCreateClick(object? sender, EventArgs e)
     {
-        if (!int.TryParse(_librarianFineUserInput.Text, out var uId) ||
-            !int.TryParse(_librarianFineAmountInput.Text, out var osszeg))
+        if (!int.TryParse(_librarianFineUserInput.Text.Trim(), out var uId) ||
+            !int.TryParse(_librarianFineLoanIdInput.Text.Trim(), out var kId) ||
+            !int.TryParse(_librarianFineAmountInput.Text.Trim(), out var osszeg))
         {
-            SetLibrarianFineFeedback("Hiba: Felhasználó ID és Összeg megadása kötelező (szám)!", true);
+            SetLibrarianFineFeedback("Hiba: Felhasználó ID, Kölcsönzés ID és Összeg kötelező!", true);
             return;
         }
 
         string megjegyzes = _librarianFineNoteInput.Text.Trim();
-
         SetLibrarianFineFeedback("Bírság rögzítése...");
 
-        if (await ApiClient.CreateBuntetesDetailedAsync(uId, osszeg, megjegyzes))
+        if (await ApiClient.CreateBuntetesDetailedAsync(uId, osszeg, megjegyzes, kId))
         {
-            SetLibrarianFineFeedback("Bírság sikeresen kiszabva!");
+            SetLibrarianFineFeedback("Bírság sikeresen rögzítve!");
             _librarianFineUserInput.Clear();
+            _librarianFineLoanIdInput.Clear();
             _librarianFineAmountInput.Clear();
             _librarianFineNoteInput.Clear();
-            await RefreshFinesGrid(); 
-        }
-        else
-        {
-            SetLibrarianFineFeedback("Hiba történt a bírság rögzítésekor!", true);
+            await RefreshFinesGrid();
         }
     }
 
@@ -1079,6 +1079,7 @@ public partial class Form1 : Form
     {
         var buntetesek = await ApiClient.GetAllBuntetesAsync();
         _librarianFinesGrid.DataSource = null;
+
         if (buntetesek != null)
         {
             _librarianFinesGrid.DataSource = buntetesek.Select(b => new {

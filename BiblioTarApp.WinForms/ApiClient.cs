@@ -287,11 +287,18 @@ public static class ApiClient
         public DateTime Datum { get; set; }
     }
 
-    public static async Task<bool> CreateBuntetesDetailedAsync(int felhasznaloId, int osszeg, string megjegyzes)
+    public static async Task<bool> CreateBuntetesDetailedAsync(int felhasznaloId, int osszeg, string megjegyzes, int kolcsonzesId)
     {
         try
         {
-            var adat = new { FelhasznaloId = felhasznaloId, Osszeg = osszeg, Megjegyzes = megjegyzes };
+            var adat = new
+            {
+                FelhasznaloId = felhasznaloId,
+                Osszeg = osszeg,
+                Megjegyzes = megjegyzes,
+                KolcsonzesId = kolcsonzesId
+            };
+
             var response = await Client.PostAsJsonAsync("api/Buntetes/create", adat);
 
             if (response.IsSuccessStatusCode) return true;
