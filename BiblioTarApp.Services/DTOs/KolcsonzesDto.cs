@@ -18,7 +18,7 @@ namespace BiblioTarApp.DTOs
         public DateTime KolcsozesIdeje { get; set; }
         public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
-        public int MeghosszabbitasiLehetosegek { get; set; }
+        public int MeghosszabbitasiLehetosegek { get; set; } = 2;
         public KolcsonzesStatusz Statusz { get; set; }
     }
 

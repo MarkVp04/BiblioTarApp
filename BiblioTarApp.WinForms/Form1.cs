@@ -595,8 +595,7 @@ public partial class Form1 : Form
             FlowDirection = FlowDirection.LeftToRight
         };
         historyActionRow.Controls.Add(CreatePrimaryButton("Frissites", HandleUserHistoryRefreshClick));
-        historyActionRow.Controls.Add(CreatePrimaryButton("Hosszabbitas (max 2x)", HandleUserHistoryExtendClick));
-        historyPanel.Controls.Add(_userHistoryGrid, 0, 0);
+        historyActionRow.Controls.Add(CreatePrimaryButton("Hosszabbitas (max 2x)", async (s, e) => await HandleHosszabbitas())); historyPanel.Controls.Add(_userHistoryGrid, 0, 0);
         historyPanel.Controls.Add(historyActionRow, 0, 1);
         historyPanel.Controls.Add(_userHistoryInfoLabel, 0, 2);
         historyGroup.Controls.Add(historyPanel);
@@ -675,29 +674,50 @@ public partial class Form1 : Form
         _userBooksInfoLabel.Text = $"Talalatok: {filtered.Count}";
     }
 
-    private void RefreshUserHistoryGrid()
+    private async Task RefreshUserHistoryGrid()
     {
-        _userHistoryGrid.DataSource = null;
-
-        _userHistoryGrid.DataSource = _userHistoryData.Select(x => new
+        var history = await ApiClient.GetMyHistoryAsync();
+        if (history != null)
         {
-            Könyv = x.KonyvCim,
-            Szerző = x.Szerzo,
-            Kölcsönzés = x.KolcsonzesIdeje.ToString("yyyy.MM.dd"),
-            Határidő = x.Hatarido.ToString("yyyy.MM.dd"),
-            Státusz = x.Statusz switch
-            {
-                0 => "Aktív",
-                1 => "Lezárt",
-                2 => "Késedelmes",
-                _ => "Ismeretlen"
-            },
-            Hosszabbítások = x.HosszabbitasokSzama
-        }).ToList();
+            _userHistoryGrid.DataSource = history.Select(h => new {
+                Id = h.Id,
+                Könyv = h.KonyvCim,
+                Szerző = h.Szerzo,
+                Határidő = h.Hatarido.ToShortDateString(),
+                Hosszabbítások = h.HosszabbitasokSzama,
+                Státusz = h.Statusz == 1 ? "Aktív" : "Visszahozva" 
+            }).ToList();
 
-        _userHistoryInfoLabel.Text = _userHistoryData.Count == 0
-            ? "Nincs kölcsönzési előzmény."
-            : $"Kölcsönzések száma: {_userHistoryData.Count}";
+            if (_userHistoryGrid.Columns["Id"] != null)
+                _userHistoryGrid.Columns["Id"].Visible = false;
+        }
+    }
+    private async Task HandleHosszabbitas()
+    {
+        if (_userHistoryGrid.SelectedRows.Count == 0)
+        {
+            MessageBox.Show("Válassz ki egy kölcsönzést a listából!");
+            return;
+        }
+
+        int id = (int)_userHistoryGrid.SelectedRows[0].Cells["Id"].Value;
+
+        var result = MessageBox.Show("Szeretnéd meghosszabbítani a határidőt 1 héttel?",
+                                    "Hosszabbítás", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+        if (result == DialogResult.Yes)
+        {
+            bool siker = await ApiClient.HosszabbitasAsync(id);
+            if (siker)
+            {
+                MessageBox.Show("Hosszabbítási kérelem sikeresen elküldve!");
+                await RefreshUserHistoryGrid();
+            }
+            else
+            {
+                MessageBox.Show("A hosszabbítás nem sikerült. (Lehet, hogy már elérted a maximum limitet?)");
+            }
+        }
     }
 
     public async Task LoadUserBooksFromApiAsync()
@@ -731,19 +751,19 @@ public partial class Form1 : Form
         SetStatusBar("Kölcsönzési előzmények frissítve.", StatusTone.Success);
     }
 
-    private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
-{
-    if (_userHistoryGrid.CurrentRow == null)
-    {
-        NotifyInfo("Hosszabbítás", "Válassz kölcsönzést.");
-        return;
-    }
+    //private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
+    //{
+    //if (_userHistoryGrid.CurrentRow == null)
+    //{
+    //    NotifyInfo("Hosszabbítás", "Válassz kölcsönzést.");
+    //    return;
+    //}
 
-    NotifyInfo(
-        "Hosszabbítás",
-        "A hosszabbítás backend bekötése még nincs implementálva ehhez a listához."
-    );
-}
+    //NotifyInfo(
+    //    "Hosszabbítás",
+    //    "A hosszabbítás backend bekötése még nincs implementálva ehhez a listához."
+    //);
+    //}
 
     private TabPage BuildLibrarianTab()
     {

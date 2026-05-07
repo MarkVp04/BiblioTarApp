@@ -233,7 +233,7 @@ public static class ApiClient
         public DateTime KolcsozesIdeje { get; set; }
         public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
-        public int MeghosszabbitasiLehetosegek { get; set; }
+        public int MeghosszabbitasiLehetosegek { get; set; } = 2;
         public int Statusz { get; set; }
     }
 
@@ -264,8 +264,6 @@ public static class ApiClient
     {
         try
         {
-            // Feltételezve, hogy a backend a bejelentkezett user ID-ja alapján szűr a tokenből, 
-            // vagy van egy ilyen endpoint: api/Kolcsonzes/user/{id}
             var response = await Client.GetAsync($"api/Kolcsonzes/user/{CurrentUser?.FelhasznaloId}");
 
             if (response.IsSuccessStatusCode)
@@ -278,6 +276,24 @@ public static class ApiClient
         {
             MessageBox.Show($"Hiba a történet lekérésekor: {ex.Message}");
             return null;
+        }
+    }
+    public static async Task<bool> HosszabbitasAsync(int kolcsonzesId)
+    {
+        try
+        {
+            var response = await Client.PostAsync($"api/Kolcsonzes/extend/{kolcsonzesId}", null);
+
+            if (response.IsSuccessStatusCode) return true;
+
+            var errorMsg = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"Nem sikerült a hosszabbítás: {errorMsg}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba: {ex.Message}");
+            return false;
         }
     }
 
@@ -302,6 +318,7 @@ public static class ApiClient
     }
     public class KolcsonzesHistoryDto
     {
+        public int Id { get; set; }
         public string KonyvCim { get; set; } = string.Empty;
         public string Szerzo { get; set; } = string.Empty;
         public DateTime KolcsonzesIdeje { get; set; }
