@@ -39,12 +39,7 @@ namespace BiblioTarApp.Controllers
         {
             var result = await _foglalasService.List();
 
-            if (result == null || !result.Any())
-            {
-                return NotFound();
-            }
-
-            return Ok(result);
+            return Ok(result ?? new List<FoglalasGetDto>());
         }
 
         [HttpGet]
@@ -65,19 +60,13 @@ namespace BiblioTarApp.Controllers
 
         [HttpGet]
         [Route("user/{felhasznaloId}")]
-        [Authorize(Policy = "StaffPolicy")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> GetByFelhasznaloId(int felhasznaloId)
         {
             try
             {
                 var result = await _foglalasService.GetByFelhasznaloId(felhasznaloId);
-
-                if (result == null || !result.Any())
-                {
-                    return NotFound();
-                }
-
-                return Ok(result);
+                return Ok(result ?? new List<FoglalasGetDto>());
             }
             catch (Exception ex)
             {

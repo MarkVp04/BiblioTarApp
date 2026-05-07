@@ -56,11 +56,8 @@ namespace BiblioTarApp.Services
 
             var felhasznalo = _mapper.Map<Felhasznalo>(felhasznaloCreateDto);
 
-            // Jelszó hashelése
             felhasznalo.Jelszo = BCrypt.Net.BCrypt.HashPassword(felhasznaloCreateDto.Jelszo);
 
-            // JAVÍTÁS: Nem írjuk felül fixen 1-esre. 
-            // Ha a DTO-ban jött szerepkör (nem 0), azt használjuk, különben alapértelmezett a Regisztralt.
             if (felhasznaloCreateDto.Szerepkor != 0)
             {
                 felhasznalo.Szerepkor = felhasznaloCreateDto.Szerepkor;

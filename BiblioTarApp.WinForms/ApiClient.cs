@@ -9,6 +9,7 @@ public static class ApiClient
 {
     public static readonly HttpClient Client = new HttpClient();
     public static string? Token { get; private set; }
+    public static LoginResponse? CurrentUser { get; private set; }
 
     static ApiClient()
     {
@@ -29,6 +30,7 @@ public static class ApiClient
                 if (result != null && !string.IsNullOrEmpty(result.Token))
                 {
                     Token = result.Token;
+                    CurrentUser = result;
                     Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
                     return result;
                 }
@@ -40,6 +42,36 @@ public static class ApiClient
 
         return null;
     }
+
+    public static async Task<List<KolcsonzesHistoryDto>?> GetMyHistoryAsync()
+    {
+        try
+        {
+            var response = await Client.GetAsync($"api/Kolcsonzes/user/{CurrentUser?.FelhasznaloId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<List<KolcsonzesHistoryDto>>();
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hiba a történet lekérésekor: {ex.Message}");
+            return null;
+        }
+    }
+
+    public class KolcsonzesHistoryDto
+    {
+        public string KonyvCim { get; set; } = string.Empty;
+        public string Szerzo { get; set; } = string.Empty;
+        public DateTime KolcsozesIdeje { get; set; } 
+        public DateTime Hatarido { get; set; }
+        public int Statusz { get; set; }
+        public int MeghosszabbitasiLehetosegek { get; set; }
+    }
+
     public static async Task<List<KonyvDto>?> GetKonyvekAsync()
     {
         try
@@ -229,7 +261,7 @@ public static class ApiClient
         public int KonyvId { get; set; }
         public string KonyvCim { get; set; } = string.Empty;
         public int FoglalasId { get; set; }
-        public DateTime KolcsozesIdeje { get; set; }
+        public DateTime KolcsonzesIdeje { get; set; }
         public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }

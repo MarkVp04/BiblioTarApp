@@ -20,6 +20,7 @@ namespace BiblioTarApp.DTOs
         public DateTime Hatarido { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }
         public KolcsonzesStatusz Statusz { get; set; }
+        public string Szerzo { get; set; } = string.Empty;
     }
 
     public class KolcsonzesHosszabbitasDto

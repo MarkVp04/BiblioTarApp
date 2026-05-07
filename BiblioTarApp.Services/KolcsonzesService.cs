@@ -112,14 +112,26 @@ namespace BiblioTarApp.Services
                 throw new Exception("A felhasználó nem található.");
             }
 
-            var kolcsonzesek = await _context.Kolcsonzesek
+            // Itt a .Map helyett .Select-et használunk
+            return await _context.Kolcsonzesek
                 .Include(k => k.Konyv)
                 .Include(k => k.Foglalas)
                 .Where(k => k.FelhasznaloId == felhasznaloId)
                 .OrderByDescending(k => k.KolcsozesIdeje)
+                .Select(k => new KolcsonzesGetDto
+                {
+                    Id = k.Id,
+                    FelhasznaloId = k.FelhasznaloId,
+                    KonyvId = k.BookId,
+                    KonyvCim = k.Konyv.Cim,
+                    Szerzo = k.Konyv.Szerzo, 
+                    FoglalasId = k.FoglalasId,
+                    KolcsozesIdeje = k.KolcsozesIdeje,
+                    Hatarido = k.Foglalas.Hatarido,
+                    MeghosszabbitasiLehetosegek = k.Foglalas.MeghosszabbitasiLehetosegek,
+                    Statusz = k.Statusz
+                })
                 .ToListAsync();
-
-            return _mapper.Map<List<KolcsonzesGetDto>>(kolcsonzesek);
         }
 
         public async Task<string> Hosszabbitas(KolcsonzesHosszabbitasDto kolcsonzesHosszabbitasDto)

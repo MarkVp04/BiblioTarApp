@@ -65,7 +65,7 @@ namespace BiblioTarApp.Controllers
 
         [HttpGet]
         [Route("user/{felhasznaloId}")]
-        [Authorize(Policy = "StaffPolicy")]
+        [Authorize(Policy = "AllUserPolicy")]
         public async Task<IActionResult> GetByFelhasznaloId(int felhasznaloId)
         {
             try

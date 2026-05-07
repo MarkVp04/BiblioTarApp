@@ -1,4 +1,5 @@
 using BiblioTarApp.DTOs;
+using System.Text.Json.Serialization;
 using System.Windows.Forms;
 
 namespace BiblioTarApp.WinForms;
@@ -36,8 +37,7 @@ public partial class Form1 : Form
     private DataGridView _userHistoryGrid = null!;
     private Label _userBooksInfoLabel = null!;
     private Label _userHistoryInfoLabel = null!;
-    private readonly List<UserBookMockItem> _userBooksData = new();
-    private readonly List<UserHistoryMockItem> _userHistoryData = new();
+    private List<ApiClient.KolcsonzesHistoryDto> _userHistoryData = new();
     private TextBox _librarianUserIdInput = null!;
     private TextBox _librarianBookIdInput = null!;
     private DateTimePicker _librarianDeadlinePicker = null!;
@@ -480,6 +480,7 @@ public partial class Form1 : Form
             ApplyRoleTabs(loginResult.Szerepkor);
 
             await LoadUserBooksFromApiAsync();
+            await LoadUserHistoryFromApiAsync();
 
             if (loginResult.Szerepkor == "Konyvtaros" || loginResult.Szerepkor == "Adminisztrator")
             {
@@ -687,10 +688,29 @@ public partial class Form1 : Form
 
     private void RefreshUserHistoryGrid()
     {
-        _userHistoryGrid.DataSource = _userHistoryData.ToList();
+        _userHistoryGrid.DataSource = null;
+
+        _userHistoryGrid.DataSource = _userHistoryData.Select(x => new
+        {
+            Könyv = x.KonyvCim,
+            Szerző = string.IsNullOrEmpty(x.Szerzo) ? "Nincs az API válaszban" : x.Szerzo,
+
+            Kölcsönzés = x.KolcsozesIdeje.Year < 2000 ? "Nincs adat" : x.KolcsozesIdeje.ToString("yyyy.MM.dd"),
+            Határidő = x.Hatarido.ToString("yyyy.MM.dd"),
+
+            Státusz = x.Statusz switch
+            {
+                1 => "Aktív",
+                2 => "Teljesített",
+                3 => "Törölve",
+                _ => "Ismeretlen"
+            },
+            Hosszabbítások = x.MeghosszabbitasiLehetosegek
+        }).ToList();
+
         _userHistoryInfoLabel.Text = _userHistoryData.Count == 0
-            ? "Nincs meg kolcsonzesi elozmeny."
-            : $"Kolcsonzesi tetelszam: {_userHistoryData.Count}";
+            ? "Nincs kölcsönzési előzmény."
+            : $"Kölcsönzések száma: {_userHistoryData.Count}";
     }
 
     public async Task LoadUserBooksFromApiAsync()
@@ -703,34 +723,40 @@ public partial class Form1 : Form
         }
     }
 
-    private void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
+    public async Task LoadUserHistoryFromApiAsync()
     {
-        RefreshUserHistoryGrid();
-        SetStatusBar("Felhasznalo nezet: kolcsonzesi lista frissitve (mock).", StatusTone.Success);
+        var history = await ApiClient.GetMyHistoryAsync();
+
+        if (history != null)
+        {
+            _userHistoryData = history;
+            RefreshUserHistoryGrid();
+        }
+        else
+        {
+            _userHistoryData.Clear();
+            RefreshUserHistoryGrid();
+        }
+    }
+
+    private async void HandleUserHistoryRefreshClick(object? sender, EventArgs e)
+    {
+        await LoadUserHistoryFromApiAsync();
+        SetStatusBar("Kölcsönzési előzmények frissítve.", StatusTone.Success);
     }
 
     private void HandleUserHistoryExtendClick(object? sender, EventArgs e)
     {
-        if (_userHistoryGrid.CurrentRow?.DataBoundItem is not UserHistoryMockItem selected)
+        if (_userHistoryGrid.CurrentRow == null)
         {
-            NotifyInfo("Hosszabbitas", "Valassz kolcsonzest a hosszabbitashoz.");
+            NotifyInfo("Hosszabbítás", "Válassz kölcsönzést.");
             return;
         }
 
-        if (!string.Equals(selected.Statusz, "Aktiv", StringComparison.OrdinalIgnoreCase))
-        {
-            NotifyWarning("Hosszabbitas", "Csak aktiv kolcsonzes hosszabbithato.");
-            return;
-        }
-
-        if (selected.Hosszabbitasok >= 2)
-        {
-            NotifyWarning("Hosszabbitas", "A kolcsonzes mar elerte a max 2 hosszabbitast.");
-            return;
-        }
-
-        NotifyInfo("Hosszabbitas", "A hosszabbitas kerese rogzitve (mock). Backend bekotes kesobb.");
-        SetStatusBar("Felhasznalo nezet: hosszabbitas kerese elokeszitve (mock).", StatusTone.Success);
+        NotifyInfo(
+            "Hosszabbítás",
+            "A hosszabbítás backend bekötése még nincs implementálva ehhez a listához."
+        );
     }
 
     private TabPage BuildLibrarianTab()
