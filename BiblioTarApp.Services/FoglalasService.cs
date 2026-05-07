@@ -75,6 +75,7 @@ namespace BiblioTarApp.Services
             };
 
             konyv.Statusz = KonyvStatusz.Foglalt.ToString();
+            konyv.Kolcsonozheto = false;
 
             await _context.Foglalasok.AddAsync(foglalas);
             _context.Konyvek.Update(konyv);
