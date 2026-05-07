@@ -233,7 +233,7 @@ public static class ApiClient
         public DateTime KolcsozesIdeje { get; set; }
         public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
-        public int MeghosszabbitasiLehetosegek { get; set; } = 2;
+        public int MeghosszabbitasiLehetosegek { get; set; }
         public int Statusz { get; set; }
     }
 
