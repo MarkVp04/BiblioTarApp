@@ -85,6 +85,26 @@ namespace BiblioTarApp.Controllers
             }
         }
 
+        // Ezt a felhasználói felület hívja, amikor a user hosszabbítást kér.
+        // Nem hosszabbít azonnal, csak "hosszabbításra vár" állapotba teszi.
+        [HttpPut]
+        [Route("request-extension/{id}")]
+        [Authorize(Policy = "AllUserPolicy")]
+        public async Task<IActionResult> RequestExtension(int id)
+        {
+            try
+            {
+                var result = await _kolcsonzesService.RequestExtension(id);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        // Ezt a könyvtáros használja a hosszabbítás engedélyezésére.
+        // Itt történik ténylegesen a határidő módosítása.
         [HttpPut]
         [Route("extend")]
         [Authorize(Policy = "StaffPolicy")]
@@ -109,6 +129,22 @@ namespace BiblioTarApp.Controllers
             try
             {
                 var result = await _kolcsonzesService.UpdateStatus(kolcsonzesStatuszUpdateDto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete]
+        [Route("delete/{id}")]
+        [Authorize(Policy = "StaffPolicy")]
+        public async Task<IActionResult> DeleteClosedLoan(int id)
+        {
+            try
+            {
+                var result = await _kolcsonzesService.DeleteClosedLoan(id);
                 return Ok(result);
             }
             catch (Exception ex)

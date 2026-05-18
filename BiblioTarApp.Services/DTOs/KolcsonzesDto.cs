@@ -5,6 +5,7 @@ namespace BiblioTarApp.DTOs
     public class KolcsonzesCreateDto
     {
         public int FoglalasId { get; set; }
+        public DateTime? Hatarido { get; set; }
     }
 
     public class KolcsonzesGetDto

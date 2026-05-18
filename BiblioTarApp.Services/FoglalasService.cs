@@ -143,10 +143,12 @@ namespace BiblioTarApp.Services
             if (foglalas.Statusz == FoglalasStatusz.Foglalt)
             {
                 foglalas.Konyv.Statusz = KonyvStatusz.Foglalt.ToString();
+                foglalas.Konyv.Kolcsonozheto = false;
             }
             else
             {
                 foglalas.Konyv.Statusz = KonyvStatusz.Elerheto.ToString();
+                foglalas.Konyv.Kolcsonozheto = true;
             }
 
             _context.Foglalasok.Update(foglalas);
@@ -172,6 +174,7 @@ namespace BiblioTarApp.Services
 
             foglalas.Statusz = FoglalasStatusz.Torolve;
             foglalas.Konyv.Statusz = KonyvStatusz.Elerheto.ToString();
+            foglalas.Konyv.Kolcsonozheto = true;
 
             _context.Foglalasok.Update(foglalas);
             _context.Konyvek.Update(foglalas.Konyv);

@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using BiblioTarApp.DTOs;
 using BiblioTarApp.Services;
 
@@ -67,7 +68,8 @@ public static class ApiClient
         public int Id { get; set; }
         public string KonyvCim { get; set; } = string.Empty;
         public string Szerzo { get; set; } = string.Empty;
-        public DateTime KolcsonzesIdeje { get; set; } 
+        [JsonPropertyName("kolcsozesIdeje")]
+        public DateTime KolcsonzesIdeje { get; set; }
         public DateTime Hatarido { get; set; }
         public int Statusz { get; set; }
         public int MeghosszabbitasiLehetosegek { get; set; }
@@ -95,7 +97,7 @@ public static class ApiClient
             return null;
         }
     }
-    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo,string telefonszam, int szerepkor)
+    public static async Task<bool> RegisterAsync(string nev, string email, string jelszo, string telefonszam, int szerepkor)
     {
         var registerData = new
         {
@@ -116,6 +118,61 @@ public static class ApiClient
             return false;
         }
     }
+    public static async Task<bool> UpdateCurrentUserAsync(string nev, string email, string telefonszam)
+    {
+        try
+        {
+            var response = await Client.PutAsJsonAsync("api/Felhasznalo/update", new
+            {
+                Id = CurrentUser?.FelhasznaloId ?? 0,
+                Nev = nev,
+                Email = email,
+                Telefonszam = telefonszam
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                MessageBox.Show($"Saját adatok mentési hiba: {response.StatusCode}\n{error}");
+            }
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba saját adatok mentésekor: {ex.Message}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> SaveMyLakcimAsync(int iranyitoszam, string varos, string utca, string hazszam)
+    {
+        try
+        {
+            var response = await Client.PostAsJsonAsync("api/Lakcim/save-current", new
+            {
+                Iranyitoszam = iranyitoszam,
+                Varos = varos,
+                Utca = utca,
+                Hazszam = hazszam,
+                FelhasznaloId = CurrentUser?.FelhasznaloId ?? 0
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                MessageBox.Show($"Lakcím mentési hiba: {response.StatusCode}\n{error}");
+            }
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba lakcím mentésekor: {ex.Message}");
+            return false;
+        }
+    }
+
     public static async Task<bool> CreateKonyvAsync(KonyvCreateDto ujKonyv)
     {
         try
@@ -223,14 +280,23 @@ public static class ApiClient
         catch (Exception ex) { MessageBox.Show($"Hiba: {ex.Message}"); return null; }
     }
 
-    public static async Task<bool> CreateKolcsonzesAsync(int foglalasId)
+    public static async Task<bool> CreateKolcsonzesAsync(int foglalasId, DateTime hatarido)
     {
         try
         {
-            var response = await Client.PostAsJsonAsync("api/Kolcsonzes/create", new { FoglalasId = foglalasId });
+            var response = await Client.PostAsJsonAsync("api/Kolcsonzes/create", new
+            {
+                FoglalasId = foglalasId,
+                Hatarido = hatarido
+            });
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    public static async Task<bool> CreateKolcsonzesAsync(int foglalasId)
+    {
+        return await CreateKolcsonzesAsync(foglalasId, DateTime.Today.AddDays(14));
     }
 
     public static async Task<bool> UpdateKolcsonzesStatuszAsync(int kolcsonzesId, int statusz)
@@ -241,6 +307,46 @@ public static class ApiClient
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    public static async Task<bool> RequestKolcsonzesExtensionAsync(int kolcsonzesId)
+    {
+        try
+        {
+            var response = await Client.PutAsync($"api/Kolcsonzes/request-extension/{kolcsonzesId}", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            var error = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"Hosszabbítási kérés hiba: {response.StatusCode}\n{error}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba hosszabbítási kéréskor: {ex.Message}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> DeleteKolcsonzesAsync(int kolcsonzesId)
+    {
+        try
+        {
+            var response = await Client.DeleteAsync($"api/Kolcsonzes/delete/{kolcsonzesId}");
+            if (response.IsSuccessStatusCode) return true;
+
+            var error = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"Kölcsönzés törlési hiba: {response.StatusCode}\n{error}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Hálózati hiba kölcsönzés törlésekor: {ex.Message}");
+            return false;
+        }
     }
 
     public static async Task<bool> ExtendKolcsonzesAsync(int kolcsonzesId, DateTime ujHatarido)
@@ -271,6 +377,7 @@ public static class ApiClient
         public int KonyvId { get; set; }
         public string KonyvCim { get; set; } = string.Empty;
         public int FoglalasId { get; set; }
+        [JsonPropertyName("kolcsozesIdeje")]
         public DateTime KolcsonzesIdeje { get; set; }
         public DateTime? VisszahozasIdeje { get; set; }
         public DateTime Hatarido { get; set; }
@@ -281,10 +388,12 @@ public static class ApiClient
     public class BuntetesGetDto
     {
         public int Id { get; set; }
-        public string FelhasznaloNev { get; set; } = string.Empty;
-        public int Osszeg { get; set; }
-        public string Megjegyzes { get; set; } = string.Empty;
-        public DateTime Datum { get; set; }
+        public int FelhasznaloId { get; set; }
+        public int FoglalasId { get; set; }
+        public string KonyvCim { get; set; } = string.Empty;
+        public int Ar { get; set; }
+        public bool FizetesiStatusz { get; set; }
+        public DateTime BuntetesIdeje { get; set; }
     }
 
     public static async Task<bool> CreateBuntetesDetailedAsync(int felhasznaloId, int osszeg, string megjegyzes, int kolcsonzesId)
