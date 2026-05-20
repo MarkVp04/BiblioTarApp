@@ -1545,8 +1545,8 @@ public partial class Form1 : Form
 
         _adminIsNewBookMode = true;
         ClearAdminDetailForm();
-        SetAdminDetailFeedback("Uj konyv mod: toltsd ki a kotelezo mezoket, majd Ment.");
-        SetStatusBar("Admin nezet: uj konyv mod (mock).");
+        SetAdminDetailFeedback("Új könyv mód: töltsd ki a kötelező mezőket, majd Ment.");
+        SetStatusBar("Admin nézet: új könyv mód.");
     }
 
     private void HandleAdminReloadSelectionClick(object? sender, EventArgs e)
@@ -1560,8 +1560,8 @@ public partial class Form1 : Form
 
         _adminIsNewBookMode = false;
         LoadAdminDetailFromBook(selected);
-        SetAdminDetailFeedback("Adatok ujratoltve a kivalasztott sorbol.");
-        SetStatusBar("Admin nezet: szerkesztes (mock).");
+        SetAdminDetailFeedback("Adatok újratöltve a kiválasztott sorból.");
+        SetStatusBar("Admin nézet: szerkesztés.");
     }
 
     private async void HandleAdminDeleteClick(object? sender, EventArgs e)
@@ -2004,17 +2004,17 @@ public partial class Form1 : Form
     }
 }
 
-internal sealed record UserBookMockItem(string Cim, string Szerzo, string Kategoria, int Kiadasev, bool Elerheto);
+//internal sealed record UserBookMockItem(string Cim, string Szerzo, string Kategoria, int Kiadasev, bool Elerheto);
 
-internal sealed record UserHistoryMockItem(string Konyv, string KolcsonzesDatuma, string Hatarido, string Statusz, int Hosszabbitasok);
+//internal sealed record UserHistoryMockItem(string Konyv, string KolcsonzesDatuma, string Hatarido, string Statusz, int Hosszabbitasok);
 
 
-internal sealed record AdminBookMockItem(
-    int Id,
-    string Cim,
-    string Szerzo,
-    string? Isbn,
-    string Kategoria,
-    int Kiadasev,
-    bool Kolcsonozheto,
-    string Allapot);
+//internal sealed record AdminBookMockItem(
+//    int Id,
+//    string Cim,
+//    string Szerzo,
+//    string? Isbn,
+//    string Kategoria,
+//    int Kiadasev,
+//    bool Kolcsonozheto,
+//    string Allapot);
